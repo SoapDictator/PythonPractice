@@ -1,15 +1,16 @@
 class Animal(object):
 	pass
 
-class __init__(self, name):
-	self.name = name
+class Dog(Animal):
+	def __init__(self, name):
+		self.name = name
 	
 class Cat(Animal):
-	def __init__(self, name)
+	def __init__(self, name):
 		self.name = name
 		
-class Person(object)
-	def __init__(self, name)
+class Person(object):
+	def __init__(self, name):
 		self.name = name
 		
 		self.pet = None
@@ -23,10 +24,10 @@ class Employee(Person):
 class Fish(object):
 		pass
 		
-class Salmon(Fish)
+class Salmon(Fish):
 	pass
 	
-class Halibut(Fish)
+class Halibut(Fish):
 	pass
 	
 #now's the time to create some objects
