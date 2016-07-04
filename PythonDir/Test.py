@@ -1,18 +1,42 @@
-class Song(object):
+class Animal(object):
+	pass
+
+class __init__(self, name):
+	self.name = name
 	
-	def __init__(self, lyrics):
-		self.lyrics = lyrics
+class Cat(Animal):
+	def __init__(self, name)
+		self.name = name
+		
+class Person(object)
+	def __init__(self, name)
+		self.name = name
+		
+		self.pet = None
+		
+class Employee(Person):
+	def __init__(self, name, salary):
+		super(Employee, self).__init__(name)
+		self.salary = salary
+		
+#now we're talking fish
+class Fish(object):
+		pass
+		
+class Salmon(Fish)
+	pass
 	
-	def sing_me_a_song(self):
-		for line in self.lyrics:
-			print line
-								
-happy_bday = Song(["Happy birthday to you",
-                   "I don't want to get sued",
-                   "So I'll stop right there"])
-					
-bulls_on_parade = Song(["They rally around the family",
-						"With pockets full of shells"])
-						
-happy_bday.sing_me_a_song()
-bulls_on_parade.sing_me_a_song()
+class Halibut(Fish)
+	pass
+	
+#now's the time to create some objects
+rover = Dog("Rover")
+satan = Cat("Satan")
+mary = Person("Mary")
+mary.pet = satan
+frank = Employee("Frank", 120000)
+frank.pet = rover
+
+flipper = Fish()
+crouse = Salmon()
+harry = Halibut()
