@@ -1,43 +1,62 @@
-class Animal(object):
-	pass
+from sys import exit
+from random import randint
 
-class Dog(Animal):
-	def __init__(self, name):
-		self.name = name
+class Scene(object):
+	def enter(self):
+		print "This scene is not yet configured. Subclass it and implement enter()."
+        exit(1)
+		
+class Engine(object):
+	def __init__(self, scene_map):
+		self.scene_map = scene_map
+		
+	def play(self):
+		current_scene = self.scene_map.opening_scene()
+		last_scene = self.scene_map.next_scene('finished')
+		
+		while current_scene != last_scene:
+			next_scene_name = current_scene.enter()
+			current_scene = self.scene_map.next_scene(next_scene_name)
+			
+		current_scene.enter()
+
+#Scenes
+class Death(Scene):
+	quips = [
+		"You died. Good job!",
+		"Zap zap. You're dead.",
+		"Pro-tip: don't die. Oh, it's too late."]
 	
-class Cat(Animal):
-	def __init__(self, name):
-		self.name = name
+	def enter(self):
+		print Death.quips[randint(0, len(self.quips)-1)]
+		exit(1)
 		
-class Person(object):
-	def __init__(self, name):
-		self.name = name
-		
-		self.pet = None
-		
-class Employee(Person):
-	def __init__(self, name, salary):
-		super(Employee, self).__init__(name)
-		self.salary = salary
-		
-#now we're talking fish
-class Fish(object):
+class CentralCorridor(Scene):
+	def enter(self):
 		pass
 		
-class Salmon(Fish):
-	pass
-	
-class Halibut(Fish):
-	pass
-	
-#now's the time to create some objects
-rover = Dog("Rover")
-satan = Cat("Satan")
-mary = Person("Mary")
-mary.pet = satan
-frank = Employee("Frank", 120000)
-frank.pet = rover
-
-flipper = Fish()
-crouse = Salmon()
-harry = Halibut()
+class LaserWeapomArmory(Scene):
+	def enter(self):
+		pass
+		
+class TheBridge(Scene):
+	def enter(self):
+		pass
+		
+class EscapePod(Scene):
+	def enter(self):
+		pass
+		
+class Map(object):
+	def __init__(self, start_scene):
+		pass
+		
+	def next_scene(self, scene_name):
+		pass
+		
+	def opening_scene(self):
+		pass
+		
+a_map = Map('central_corridor')
+a_game = Engine(a_map)
+a_game.play()
