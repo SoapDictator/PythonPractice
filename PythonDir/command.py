@@ -1,6 +1,6 @@
 class Command(object):
 	def execute(self):
-		print "I here!"
+		print "I am here!"
 	
 class Command_Jump(Command):
 	def execute(self):

@@ -4,7 +4,7 @@
 import pygame, sys
 from pygame.locals import *
 
-FPS = 1
+FPS = 30
 WINDOWWIDTH = 640
 WINDOWHEIGTH = 480
 CELLSIZE = 20
@@ -85,8 +85,9 @@ class Tank(Unit):
 	def DestroyUnit(self): #problem: if there is only one tank the delete function doesn't work
 		global ARRAYPOSITION, TANKARRAY
 		self.coordX = -1 * CELLSIZE #resets the position just in case
-		self.coordY = -1 * CELLSIZE 
-		for TANK in TANKARRAY: #shifts all tanks overriding the destroyed one
+		self.coordY = -1 * CELLSIZE
+		del TANKARRAY[self.arrayPos]
+		for TANK in TANKARRAY: #shifts all tanks so the new tank will be last in the array
 			if self.arrayPos > TANK.arrayPos:
 				TANK.arrayPos -= 1
 		ARRAYPOSITION -= 1
@@ -114,6 +115,7 @@ class Main(object):
 						self.terminate()
 					elif event.key == K_DOWN:
 						TANKARRAY[0].MoveUnit(0, +1)
+						TANKARRAY[1].MoveUnit(0, +1)
 					elif event.key == K_UP:
 						TANKARRAY[0].MoveUnit(0, -1)
 					elif event.key == K_RIGHT:
@@ -127,6 +129,7 @@ class Main(object):
 			Window0.drawGrid()
 			for TANK in TANKARRAY:
 				TANK.DrawUnit()
+				print(TANK.coordX)
 			pygame.display.update()
 			FPSCLOCK.tick(FPS)
 			
@@ -149,4 +152,6 @@ Bulldozer = Tank()
 Bulldozer.CreateUnit(1, 1)
 Blinker = Tank()
 Blinker.CreateUnit(3, 1)
+Assault = Tank()
+Assault.CreateUnit(5, 1)
 StartShenanigans = Main()
