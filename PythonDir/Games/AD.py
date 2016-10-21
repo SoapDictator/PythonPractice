@@ -4,7 +4,7 @@
 import pygame, sys
 from pygame.locals import *
 
-FPS = 30
+FPS = 10
 WINDOWWIDTH = 640
 WINDOWHEIGTH = 480
 CELLSIZE = 20
@@ -71,7 +71,10 @@ class Tank(Unit):
 	statHealth = 0
 	statArmor = 0
 	statDamage = 0
+	statSpeed = 5
 	arrayPos = 0
+	moveQueueX = []
+	moveQueueY = []
 	
 	def CreateUnit(self, coordX, coordY): # new tank always needs to be the last one in the array
 		print("A new tank appears!")
@@ -82,7 +85,7 @@ class Tank(Unit):
 		self.coordX = coordX * CELLSIZE
 		self.coordY = coordY * CELLSIZE
 	
-	def DestroyUnit(self): #problem: if there is only one tank the delete function doesn't work
+	def DestroyUnit(self):
 		global ARRAYPOSITION, TANKARRAY
 		self.coordX = -1 * CELLSIZE #resets the position just in case
 		self.coordY = -1 * CELLSIZE
@@ -99,9 +102,21 @@ class Tank(Unit):
 		pygame.draw.rect(DISPLAYSURF, DARKRED, outerRect)
 		pygame.draw.rect(DISPLAYSURF, RED, innerRect)
 		
-	def MoveUnit(self, toX, toY):
-		self.coordX += toX * CELLSIZE
-		self.coordY += toY * CELLSIZE
+	def MoveUnit(self):
+		for step in range(0, self.statSpeed-1):
+			self.coordX += self.moveQueueX[step] * CELLSIZE
+			self.coordY += self.moveQueueY[step] * CELLSIZE
+			#pygame.time.wait(500)
+			DISPLAYSURF.fill(BGCOLOR)
+			self.DrawUnit()
+			pygame.display.update()
+			FPSCLOCK.tick(FPS)
+		self.moveQueueX.clear()
+		self.moveQueueY.clear()
+		
+	def MoveQueue(self, toX, toY):
+		self.moveQueueX.append(toX)
+		self.moveQueueY.append(toY)
 
 class Main(object):
 	def __init__(self):
@@ -114,25 +129,23 @@ class Main(object):
 					if event.key == K_ESCAPE:
 						self.terminate()
 					elif event.key == K_DOWN:
-						TANKARRAY[0].MoveUnit(0, +1)
-						TANKARRAY[1].MoveUnit(0, +1)
+						TANKARRAY[0].MoveQueue(0, +1)
 					elif event.key == K_UP:
-						TANKARRAY[0].MoveUnit(0, -1)
+						TANKARRAY[0].MoveQueue(0, -1)
 					elif event.key == K_RIGHT:
-						TANKARRAY[0].MoveUnit(+1, 0)
+						TANKARRAY[0].MoveQueue(+1, 0)
 					elif event.key == K_LEFT:
-						TANKARRAY[0].MoveUnit(-1, 0)
-					elif event.key == K_d:
-						TANKARRAY[1].DestroyUnit()
+						TANKARRAY[0].MoveQueue(-1, 0)
+					elif event.key == K_e:
+						TANKARRAY[0].MoveUnit()
 	
 			DISPLAYSURF.fill(BGCOLOR)
 			Window0.drawGrid()
 			for TANK in TANKARRAY:
 				TANK.DrawUnit()
-				print(TANK.coordX)
 			pygame.display.update()
 			FPSCLOCK.tick(FPS)
-			
+	
 	def checkForKeyPress(self):
 		if len(pygame.event.get(QUIT)) > 0:
 			self.terminate()
@@ -150,8 +163,4 @@ class Main(object):
 
 Bulldozer = Tank()
 Bulldozer.CreateUnit(1, 1)
-Blinker = Tank()
-Blinker.CreateUnit(3, 1)
-Assault = Tank()
-Assault.CreateUnit(5, 1)
 StartShenanigans = Main()
