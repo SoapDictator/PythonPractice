@@ -24,3 +24,8 @@ gui class #is it supposed to be separate from window class?
 movement class #might be a good idea, but can just create unnesesary coupling
 -> drawing
 -> unit
+sends to draw class command to draw a line of movement
+	v
+saves the movement to queue
+	v
+executes the movement by drawing the movement step by step
