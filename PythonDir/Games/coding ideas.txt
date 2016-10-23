@@ -1,31 +1,42 @@
-unit class
-->drawing
-+stats (health, armor, speed, damage)
-+active buff/debuff
-+ create
-+ destroy
-+ move(?) #may be just add it to a different class that manages movement
-- draw #certainly add another class for drawing EVERYTHING, coupling will be shit
-- moving queue #sounds like a bad idea, but it would have to be tied to a specific unit
+main #runs the entire game
+->coupled with everything
++main cycle
++management classes' initializations
 
-window class(?) #so window drawing and unit drawin is ceparate? make the drawing heirarcy
-->drawing
+unit management class #controls the selection, adding/removing units, etc.
+-> drawing management
+-> map management
++create unit
++destroy unit
++move unit #stores and executes unit's movement
++(?)draw unit #get a unit type from the unit and draws its pattern
 
-main #currently run the entire game, which is bad, needs input management class
-->main cycle, so everything
+drawing management class #so window drawing and unit drawin is ceparate? make the drawing heirarcy
+-> unit management
+-> (?) map management
+-> (?)gui #probably just draw the gui here, but configure it in another class
 
 input management class #keyboard, mouse management, command pattern is king
-->everything except unit(directly)
+-> unit management
+-> gui
++manages inputs from keyboard and sends it elsewhere
 
-gui class #is it supposed to be separate from window class?
-->window
-->input
+gui class #supposed to be separate from the drawing management class
+-> drawing management
+-> input management
+-> (?) map class #it's part of GUI, selection and everything, but merging the two is a bad idea
 
-movement class #might be a good idea, but can just create unnesesary coupling
--> drawing
--> unit
-sends to draw class command to draw a line of movement
-	v
-saves the movement to queue
-	v
-executes the movement by drawing the movement step by step
+map management class #returns the infomation about particular things being in particular places
+-> (?) gui
+-> unit management
+-> input management
+-> (?) drawing management#partially and more from a gui standpoint
++tracs positions
++tracs colisions
++tracs interactions #isn't it gui's job?
+
+unit class
+-> drawing pattern of a specific unit
+-> unit management
+-stats (health, armor, speed, damage)
+-active buff/debuff
