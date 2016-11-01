@@ -181,18 +181,18 @@ class UnitManager(object):
 		print("A tank has been erased!")
 		
 	def moveStore(self, toX, toY):
-		global SELECTEDTANK
+		global SELECTEDTANK#, TANKARRAY
 		SELECTEDTANK.moveQueueX.append(toX)
+		#print(TANKARRAY[0].moveQueueX[len(TANKARRAY[0].moveQueueX)-1])
 		SELECTEDTANK.moveQueueY.append(toY)
 		
 	def moveUnit(self):		#this is a fucking disgrace, fix it ASAP
-		global SELECTEDTANK
-		TANK = SELECTEDTANK
-		for step in range(1, len(TANK.moveQueueX)):
-			TANK.coordX += TANK.moveQueueX[step] * CELLSIZE
-			TANK.coordY += TANK.moveQueueY[step] * CELLSIZE
-			pygame.time.wait(200)
-			Window0.screenRefresh()
+		for TANK in TANKARRAY:
+			for step in range(1, len(TANK.moveQueueX)):
+				TANK.coordX += TANK.moveQueueX[step] * CELLSIZE
+				TANK.coordY += TANK.moveQueueY[step] * CELLSIZE
+				pygame.time.wait(200)
+				Window0.screenRefresh()
 		TANK.moveQueueX[0] = TANK.coordX
 		TANK.moveQueueY[0] = TANK.coordY
 		del TANK.moveQueueX[1:len(TANK.moveQueueX)]
@@ -220,8 +220,7 @@ class Tank(Unit):
 	statDamage = 0
 	statSpeed = 5
 	arrayPos = 0
-	moveQueueX = [0]
-	moveQueueY = [0]
+	moveQueue = [0]*20
 	
 	def drawUnit(self):
 		global DISPLAYSURF, CELLSIZE, DARKRED, RED

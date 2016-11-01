@@ -10,6 +10,7 @@ unit management class #controls the selection, adding/removing units, etc.
 +destroy unit
 +move unit #stores and executes unit's movement
 +(?)draw unit #get a unit type from the unit and draws its pattern
+-movement queue #have a huge array for every unit on the map, needs to be carefully managed
 
 drawing management class #so window drawing and unit drawin is ceparate? make the drawing heirarcy
 -> unit management
@@ -18,6 +19,7 @@ drawing management class #so window drawing and unit drawin is ceparate? make th
 
 input management class #keyboard, mouse management, command pattern is king
 -> unit management
+-> map management
 -> gui
 +manages inputs from keyboard and sends it elsewhere
 
@@ -25,6 +27,7 @@ gui class #supposed to be separate from the drawing management class
 -> drawing management
 -> input management
 -> (?) map class #it's part of GUI, selection and everything, but merging the two is a bad idea
++ties user interface to the interactions #duh
 
 map management class #returns the infomation about particular things being in particular places
 -> (?) gui
@@ -33,10 +36,11 @@ map management class #returns the infomation about particular things being in pa
 -> (?) drawing management#partially and more from a gui standpoint
 +tracs positions
 +tracs colisions
-+tracs interactions #isn't it gui's job?
++tracs interactions #interactions between units on the map
 
 unit class
 -> drawing pattern of a specific unit
 -> unit management
 -stats (health, armor, speed, damage)
 -active buff/debuff
+-movement queue #i will probably move it to the unit management and create one huge queue fore everyone
