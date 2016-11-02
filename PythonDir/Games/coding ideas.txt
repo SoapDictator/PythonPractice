@@ -12,7 +12,7 @@ unit management class #controls the selection, adding/removing units, etc.
 +(?)draw unit #get a unit type from the unit and draws its pattern
 -movement queue #have a huge array for every unit on the map, needs to be carefully managed
 
-drawing management class #so window drawing and unit drawin is ceparate? make the drawing heirarcy
+drawing management class #so window drawing and unit drawin is separate? make the drawing heirarcy
 -> unit management
 -> (?) map management
 -> (?)gui #probably just draw the gui here, but configure it in another class
@@ -22,6 +22,7 @@ input management class #keyboard, mouse management, command pattern is king
 -> map management
 -> gui
 +manages inputs from keyboard and sends it elsewhere
++has input states (which will probably be tied to gui to simplify binding process)
 
 gui class #supposed to be separate from the drawing management class
 -> drawing management
