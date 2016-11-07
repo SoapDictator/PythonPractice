@@ -69,26 +69,26 @@ class DrawingManager(object):
 			
 	def screenSelect(self):
 		global DISPLAYSURF, CELLSIZE, GREEN, MAPSELECT
-		outerRect = pygame.Rect(MAPSELECT.coordX, MAPSELECT.coordY, CELLSIZE, CELLSIZE )
-		topX = MAPSELECT.coordX
-		topY = MAPSELECT.coordY
-		lowX = MAPSELECT.coordX + CELLSIZE
-		lowY = MAPSELECT.coordY + CELLSIZE
+		outerRect = pygame.Rect(MAPSELECT.statCoord[0], MAPSELECT.statCoord[1], CELLSIZE, CELLSIZE )
+		topX = MAPSELECT.statCoord[0]
+		topY = MAPSELECT.statCoord[1]
+		lowX = MAPSELECT.statCoord[0] + CELLSIZE
+		lowY = MAPSELECT.statCoord[1] + CELLSIZE
 		pygame.draw.line(DISPLAYSURF, GREEN, (topX, topY), (lowX, topY))
 		pygame.draw.line(DISPLAYSURF, GREEN, (lowX, topY), (lowX, lowY))
 		pygame.draw.line(DISPLAYSURF, GREEN, (lowX, lowY), (topX, lowY))
 		pygame.draw.line(DISPLAYSURF, GREEN, (topX, lowY), (topX, topY))
 			
 	def screenMovement(self):
-		global TANKARRAY
-		for k in range(0, len(TANKARRAY)-1):
-			toX = TANKARRAY[k].moveQueueX[0] + CELLSIZE/2
-			toY = TANKARRAY[k].moveQueueY[0] + CELLSIZE/2
+		global TANKARRAY, MOVEQUEUE
+		for TANK in TANKARRAY:
+			toX = MOVEQUEUE[TANK.arrayPos][0][0] + CELLSIZE/2
+			toY = MOVEQUEUE[TANK.arrayPos][0][1] + CELLSIZE/2
 			for num in range(1, len(TANKARRAY[k].moveQueueX)):
 				x = toX
 				y = toY
-				toX += TANKARRAY[k].moveQueueX[num] * CELLSIZE
-				toY += TANKARRAY[k].moveQueueY[num] * CELLSIZE
+				toX += MOVEQUEUE[TANK.arrayPos][num][0] * CELLSIZE
+				toY += MOVEQUEUE[TANK.arrayPos][num][0] * CELLSIZE
 				pygame.draw.line(DISPLAYSURF, RED, (x, y), (toX, toY))
 			toX = 0
 			toY = 0
@@ -140,71 +140,69 @@ class MapManager(object):
 	def mapGetUnit(self):
 		global MAPSELECT, TANKARRAY
 		for TANK in TANKARRAY:
-			if TANK.coordX == MAPSELECT.coordX:
-				if TANK.coordY == MAPSELECT.coordY:
+			if TANK.statCoord[0] == MAPSELECT.statCoord[0]:
+				if TANK.statCoord[1] == MAPSELECT.statCoord[1]:
 					return TANK
 		return 0
 	
 	def moveSelect(self, toX, toY):
 		global MAPSELECT, CELLSIZE
-		MAPSELECT.coordX += toX*CELLSIZE
-		MAPSELECT.coordY += toY*CELLSIZE
+		MAPSELECT.statCoord[0] += toX*CELLSIZE
+		MAPSELECT.statCoord[1] += toY*CELLSIZE
 		
 				
 class UnitManager(object):
 	def __init__(self):
-		global TANKARRAY
+		global TANKARRAY, MOVEQUEUE
 		TANKARRAY = []
+		MOVEQUEUE = []
 	
-	def unitCreate(self, coordX, coordY): # new tank always needs to be the last one in the array
-		global TANKARRAY
+	def unitCreate(self, statCoord[0], statCoord[1]): # new tank always needs to be the last one in the array
+		global TANKARRAY, MOVEQUEUE
 		print("A new tank appears!")
 		NewTank = Tank()
+		NewTank.statCoord[0] = statCoord[0] * CELLSIZE
+		NewTank.statCoord[1] = statCoord[1] * CELLSIZE
+		
 		TANKARRAY.append(NewTank)
+		MOVEQUEUE.append([NewTank.statCoord[0],NewTank.statCoord[1]])
+		
 		NewTank.arrayPos = len(TANKARRAY)-1
-		NewTank.coordX = coordX * CELLSIZE
-		NewTank.coordY = coordY * CELLSIZE
-		NewTank.moveQueueX[0] = NewTank.coordX
-		NewTank.moveQueueY[0] = NewTank.coordY
 		return NewTank
 	
 	def unitDestroy(self, Tank):
-		global TANKARRAY
-		Tank.coordX = -1 * CELLSIZE #resets the position just in case
-		Tank.coordY = -1 * CELLSIZE
+		global TANKARRAY, MOVEQUEUE
+		Tank.statCoord[0] = -1 * CELLSIZE #resets the position just in case
+		Tank.statCoord[1] = -1 * CELLSIZE
 		del TANKARRAY[Tank.arrayPos]
+		del MOVEQUEUE[Tank.arrayPos]
 		for TANK in TANKARRAY: #shifts all tanks so the new tank will be last in the array
 			if Tank.arrayPos > TANK.arrayPos:
 				TANK.arrayPos -= 1
-		del Tank.moveQueueX[0:len(Tank.moveQueueX)]
-		del Tank.moveQueueY[0:len(Tank.moveQueueY)]
 		print("A tank has been erased!")
 		
 	def moveStore(self, toX, toY):
-		global SELECTEDTANK#, TANKARRAY
-		SELECTEDTANK.moveQueueX.append(toX)
-		#print(TANKARRAY[0].moveQueueX[len(TANKARRAY[0].moveQueueX)-1])
-		SELECTEDTANK.moveQueueY.append(toY)
+		global SELECTEDTANK, MOVEQUEUE
+		MOVEQUEUE[SELECTEDTANK.arrayPos].append([toX, toY])
 		
 	def moveUnit(self):		#this is a fucking disgrace, fix it ASAP
+		global TANKARRAY, MOVEQUEUE
 		for TANK in TANKARRAY:
-			for step in range(1, len(TANK.moveQueueX)):
-				TANK.coordX += TANK.moveQueueX[step] * CELLSIZE
-				TANK.coordY += TANK.moveQueueY[step] * CELLSIZE
+			for step in range(1, len(TANK.MOVEQUEUE[TANK.arrayPos])):
+				TANK.statCoord[0] += MOVEQUEUE[TANK.arrayPos][step][0] * CELLSIZE
+				TANK.statCoord[1] += MOVEQUEUE[TANK.arrayPos][step][1] * CELLSIZE
 				pygame.time.wait(200)
 				Window0.screenRefresh()
-		TANK.moveQueueX[0] = TANK.coordX
-		TANK.moveQueueY[0] = TANK.coordY
-		del TANK.moveQueueX[1:len(TANK.moveQueueX)]
-		del TANK.moveQueueY[1:len(TANK.moveQueueY)]
+		MOVEQUEUE[TANK.arrayPos][0][0] = TANK.statCoord[0]
+		MOVEQUEUE[TANK.arrayPos][0][1] = TANK.statCoord[1]
+		del MOVEQUEUE[TANK.arrayPos][1:len(TANK.MOVEQUEUE[TANK.arrayPos])]
 		
 	def unitSelect(self):
 		global Map0, SELECTEDTANK
 		SELECTEDTANK = Map0.mapGetUnit()
 		
 class Unit(object):
-	coordX = 0
-	coordY = 0
+	statCoord = [0, 0]
 	statHealth = 0
 	statArmor = 0
 	statDamage = 0
@@ -213,19 +211,17 @@ class Unit(object):
 		pass
 
 class Tank(Unit):
-	coordX = 0
-	coordY = 0
+	statCoord = [0, 0]
 	statHealth = 0
 	statArmor = 0
 	statDamage = 0
 	statSpeed = 5
 	arrayPos = 0
-	moveQueue = [0]*20
 	
 	def drawUnit(self):
 		global DISPLAYSURF, CELLSIZE, DARKRED, RED
-		outerRect = pygame.Rect(self.coordX +1, self.coordY +1, CELLSIZE -1, CELLSIZE -1)
-		innerRect = pygame.Rect(self.coordX +5, self.coordY +5, CELLSIZE -9, CELLSIZE -9)
+		outerRect = pygame.Rect(self.statCoord[0] +1, self.statCoord[1] +1, CELLSIZE -1, CELLSIZE -1)
+		innerRect = pygame.Rect(self.statCoord[0] +5, self.statCoord[1] +5, CELLSIZE -9, CELLSIZE -9)
 		pygame.draw.rect(DISPLAYSURF, DARKRED, outerRect)
 		pygame.draw.rect(DISPLAYSURF, RED, innerRect)
 		

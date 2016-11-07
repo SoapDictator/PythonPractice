@@ -2,6 +2,7 @@ main #runs the entire game
 ->coupled with everything
 +main cycle
 +management classes' initializations
++(?) game state machine #so basically it describes the turn "playback" as well as it definds "binds"
 
 unit management class #controls the selection, adding/removing units, etc.
 -> drawing management
