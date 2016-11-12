@@ -32,7 +32,7 @@ class InputManager(object):
 					elif event.key == K_LEFT:	Map0.moveSelect(-1, 0)
 					elif event.key == K_e:		#fix that as well
 						Unit0.unitSelect()
-						if SELECTEDTANK != 0:
+						if SELECTEDTANK != -1:
 							self.setState(1)
 			elif state == 'unitSelected':
 				if event.type == KEYDOWN:
@@ -84,11 +84,11 @@ class DrawingManager(object):
 		for TANK in TANKARRAY:
 			toX = MOVEQUEUE[TANK.arrayPos][0][0] + CELLSIZE/2
 			toY = MOVEQUEUE[TANK.arrayPos][0][1] + CELLSIZE/2
-			for num in range(1, len(TANKARRAY[k].moveQueueX)):
+			for num in range(1, len(MOVEQUEUE[TANK.arrayPos])):
 				x = toX
 				y = toY
 				toX += MOVEQUEUE[TANK.arrayPos][num][0] * CELLSIZE
-				toY += MOVEQUEUE[TANK.arrayPos][num][0] * CELLSIZE
+				toY += MOVEQUEUE[TANK.arrayPos][num][1] * CELLSIZE
 				pygame.draw.line(DISPLAYSURF, RED, (x, y), (toX, toY))
 			toX = 0
 			toY = 0
@@ -140,10 +140,9 @@ class MapManager(object):
 	def mapGetUnit(self):
 		global MAPSELECT, TANKARRAY
 		for TANK in TANKARRAY:
-			if TANK.statCoord[0] == MAPSELECT.statCoord[0]:
-				if TANK.statCoord[1] == MAPSELECT.statCoord[1]:
-					return TANK
-		return 0
+			if TANK.statCoord == MAPSELECT.statCoord:
+				return TANK
+		return -1
 	
 	def moveSelect(self, toX, toY):
 		global MAPSELECT, CELLSIZE
@@ -157,20 +156,19 @@ class UnitManager(object):
 		TANKARRAY = []
 		MOVEQUEUE = []
 	
-	def unitCreate(self, statCoord[0], statCoord[1]): # new tank always needs to be the last one in the array
+	def unitCreate(self, toX, toY): # new tank always needs to be the last one in the array
 		global TANKARRAY, MOVEQUEUE
 		print("A new tank appears!")
 		NewTank = Tank()
-		NewTank.statCoord[0] = statCoord[0] * CELLSIZE
-		NewTank.statCoord[1] = statCoord[1] * CELLSIZE
-		
 		TANKARRAY.append(NewTank)
-		MOVEQUEUE.append([NewTank.statCoord[0],NewTank.statCoord[1]])
-		
 		NewTank.arrayPos = len(TANKARRAY)-1
-		return NewTank
+		
+		NewTank.statCoord[0] = toX * CELLSIZE
+		NewTank.statCoord[1] = toY * CELLSIZE
+		
+		MOVEQUEUE.append([NewTank.statCoord])
 	
-	def unitDestroy(self, Tank):
+	def unitDestroy(self, Tank): #needs fixing
 		global TANKARRAY, MOVEQUEUE
 		Tank.statCoord[0] = -1 * CELLSIZE #resets the position just in case
 		Tank.statCoord[1] = -1 * CELLSIZE
@@ -187,15 +185,15 @@ class UnitManager(object):
 		
 	def moveUnit(self):		#this is a fucking disgrace, fix it ASAP
 		global TANKARRAY, MOVEQUEUE
+		print(MOVEQUEUE)
 		for TANK in TANKARRAY:
-			for step in range(1, len(TANK.MOVEQUEUE[TANK.arrayPos])):
-				TANK.statCoord[0] += MOVEQUEUE[TANK.arrayPos][step][0] * CELLSIZE
-				TANK.statCoord[1] += MOVEQUEUE[TANK.arrayPos][step][1] * CELLSIZE
+			for step in range(1, len(MOVEQUEUE[TANK.arrayPos])):
+				TANK.statCoord[0] += MOVEQUEUE[TANK.arrayPos][step][0]*CELLSIZE
+				TANK.statCoord[1] += MOVEQUEUE[TANK.arrayPos][step][1]*CELLSIZE
 				pygame.time.wait(200)
 				Window0.screenRefresh()
-		MOVEQUEUE[TANK.arrayPos][0][0] = TANK.statCoord[0]
-		MOVEQUEUE[TANK.arrayPos][0][1] = TANK.statCoord[1]
-		del MOVEQUEUE[TANK.arrayPos][1:len(TANK.MOVEQUEUE[TANK.arrayPos])]
+			MOVEQUEUE[TANK.arrayPos][0] = TANK.statCoord
+			del MOVEQUEUE[TANK.arrayPos][1:len(MOVEQUEUE[TANK.arrayPos])]
 		
 	def unitSelect(self):
 		global Map0, SELECTEDTANK
@@ -229,13 +227,15 @@ class Main(object):
 	def __init__(self):
 		global Window0, Input0, Unit0, Map0
 		global MoveUp, MoveDown, MoveRight, MoveLeft
+		global TANKARRAY
 		Window0 = DrawingManager()
 		Input0 = InputManager()
 		Unit0 = UnitManager()
 		Map0 = MapManager()
 		
-		Bulldozer = Unit0.unitCreate(1, 1)
-		Blinker = Unit0.unitCreate(3, 1)
+		Unit0.unitCreate(1, 1)
+		Unit0.unitCreate(3, 1)
+		TANKARRAY[0].statCoord = [20, 20]
 		
 		while True:
 			Input0.handleInput()
