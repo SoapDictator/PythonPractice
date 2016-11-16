@@ -98,7 +98,7 @@ class DrawingManager(object):
 		pygame.draw.line(self.DISPLAYSURF, self.GREEN, (lowX, lowY), (topX, lowY))
 		pygame.draw.line(self.DISPLAYSURF, self.GREEN, (topX, lowY), (topX, topY))
 			
-	def screenMovement(self):	#for some reason it updates the statCoord before the movement is finished
+	def screenMovement(self):
 		for MOVE in Unit0.MOVEQUEUE:
 			toX = MOVE[0][0] + self.CELLSIZE/2
 			toY = MOVE[0][1] + self.CELLSIZE/2
@@ -163,21 +163,19 @@ class UnitManager(object):
 	MOVEQUEUE = []
 	SELECTEDTANK = 0
 	
-	def unitCreate(self, toX, toY): # new tank always needs to be the last one in the array
+	def unitCreate(self, toX, toY): 	# new tank always will be the last one in the array
 		print("A new tank appears!")
 		NewTank = Tank()
 		self.TANKARRAY.append(NewTank)
 		NewTank.arrayPos = len(self.TANKARRAY)-1
 		
-		NewTank.statCoord[0] = toX * Window0.CELLSIZE
-		NewTank.statCoord[1] = toY * Window0.CELLSIZE
-		
-		self.MOVEQUEUE.append([NewTank.statCoord])
+		NewTank.statCoord = [toX * Window0.CELLSIZE, toY * Window0.CELLSIZE]
+		self.MOVEQUEUE.append([[toX * Window0.CELLSIZE, toY * Window0.CELLSIZE]])
 	
 	def unitDestroy(self, deletedTank):
 		del self.TANKARRAY[deletedTank.arrayPos]
 		del self.MOVEQUEUE[deletedTank.arrayPos]
-		for TANK in self.TANKARRAY: #shifts all tanks so the new tank will be last in the array
+		for TANK in self.TANKARRAY: 	#shifts all tanks so the new tank will be last in the array
 			if deletedTank.arrayPos < TANK.arrayPos:
 				TANK.arrayPos -= 1
 		print("A tank has been erased!")
@@ -189,8 +187,7 @@ class UnitManager(object):
 		else:
 			self.MOVEQUEUE[self.SELECTEDTANK.arrayPos].append([toX, toY])
 		
-	def moveUnit(self):		#for some reason it updates the statCoord before the movement is finished
-		#print(MOVEQUEUE)	#prints the entire MOVEQUEUE
+	def moveUnit(self):
 		for TANK in self.TANKARRAY:
 			for step in range(1, len(self.MOVEQUEUE[TANK.arrayPos])):
 				TANK.statCoord[0] += self.MOVEQUEUE[TANK.arrayPos][step][0]*Window0.CELLSIZE
@@ -199,7 +196,7 @@ class UnitManager(object):
 				Window0.screenRefresh()
 		
 		for TANK in self.TANKARRAY:
-			self.MOVEQUEUE[TANK.arrayPos][0] = TANK.statCoord
+			self.MOVEQUEUE[TANK.arrayPos][0] = [TANK.statCoord[0], TANK.statCoord[1]]
 			del self.MOVEQUEUE[TANK.arrayPos][1:len(self.MOVEQUEUE[TANK.arrayPos])]
 		
 	def unitSelect(self):
@@ -239,7 +236,6 @@ class Main(object):
 		
 		Unit0.unitCreate(1, 1)
 		Unit0.unitCreate(3, 1)
-		Unit0.TANKARRAY[0].statCoord = [20, 20]	#this is the only way to make their coordinates different for some reason
 		
 		while True:
 			Input0.handleInput()
