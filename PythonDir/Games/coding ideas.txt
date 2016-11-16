@@ -23,7 +23,7 @@ input management class #keyboard, mouse management, command pattern is king
 -> map management
 -> gui
 +manages inputs from keyboard and sends it elsewhere
-+has input states (which will probably be tied to gui to simplify binding process)
++has input states
 
 gui class #supposed to be separate from the drawing management class
 -> drawing management
@@ -46,3 +46,18 @@ unit class
 -stats (health, armor, speed, damage)
 -active buff/debuff
 -movement queue #i will probably move it to the unit management and create one huge queue fore everyone
+
+###
+
+game events:
+- terminate
+- screenRefresh
+- moveStore
+- moveExecute
+- moveSelection
+- unitSelect
+- mapGetUnit
+- (?)inputSwitchState
+- unitCreate
+- unitDestroy
+- (?)drawUnit #will be removed
