@@ -49,15 +49,15 @@ unit class
 
 ###
 
-game events:
-- terminate
-- screenRefresh
-- moveStore
-- moveExecute
-- moveSelection
+game events:	#here's a fair question - how far shoulf i go with these
+- (?)terminate	#i don't think i need this to begin with
+- unitMove
+- unitAttack
 - unitSelect
-- mapGetUnit
-- (?)inputSwitchState
 - unitCreate
 - unitDestroy
-- (?)drawUnit #will be removed
+
+input states:	#unitSelect event will switch those around, the question is how
+-selection movement
+-unit movement
+-unit attack
