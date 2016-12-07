@@ -6,6 +6,7 @@ from pygame.locals import *
 
 class GameEventManager(object):
 	EVENTQUEUE = []
+	LASTADDEDEVENT = 0
 	
 	def eventAdd(self, eventName, data):	#TODO: event sorting mechanism
 		event = 0
@@ -21,20 +22,15 @@ class GameEventManager(object):
 		elif eventName == "EventUnitHealthCheck":
 			event = EventUnitHealthCheck()
 			priority = 2
+		elif eventName == "EventUnitAbilityCheck":
+			pass
+			#priority = 5
 		elif eventName == "EventUnitMove":
 			event = EventUnitMove()
-			priority = 5
+			priority = 6
 		elif eventName == "EventUnitAttack":
-			targetedUnit = Map0.mapGetUnit()
-			if targetedUnit != -1 and targetedUnit != Unit0.SELECTEDUNIT:
-				X = Unit0.SELECTEDUNIT.statCoord[0]
-				Y = Unit0.SELECTEDUNIT.statCoord[1]
-				toX = targetedUnit.statCoord[0]
-				toY = targetedUnit.statCoord[1]
-				if abs(X-toX)+abs(Y-toY) <= Unit0.SELECTEDUNIT.statFR:
-					event = EventUnitAttack([Unit0.SELECTEDUNIT, targetedUnit])
-					priority = 1
-					Input0.setState(1)
+			event = EventUnitAttack(data)
+			priority = 1
 		
 		if event != 0:
 			if len(self.EVENTQUEUE) > 1:
@@ -48,10 +44,32 @@ class GameEventManager(object):
 							self.EVENTQUEUE.insert(i, [event, priority])
 			else:
 				self.EVENTQUEUE.append([event, priority])
+			self.LASTADDEDEVENT = event
+	
+	def eventUndo(self):
+		if Input0.getState() == 'unitSelected'and len(Unit0.MOVEQUEUE[Unit0.SELECTEDUNIT.arrayPos]) > 1:
+			del Unit0.MOVEQUEUE[Unit0.SELECTEDUNIT.arrayPos][1:len(Unit0.MOVEQUEUE[Unit0.SELECTEDUNIT.arrayPos])]
+		else:
+			for i in range(0, len(self.EVENTQUEUE)):
+				if self.LASTADDEDEVENT == self.EVENTQUEUE[i][0]:
+					print("Undid %s" % self.EVENTQUEUE[i][0])
+					del self.EVENTQUEUE[i]
+					self.LASTADDEDEVENT = 0
 	
 	def eventHandle(self):
 		self.eventAdd("EventUnitHealthCheck", 0)
 		self.eventAdd("EventUnitMove", 0)
+		
+		for UNIT in Unit0.UNITARRAY:
+			if isinstance(UNIT, Tank):
+				if UNIT.targetedUnit != -1:
+					Event0.eventAdd("EventUnitAttack", UNIT)
+					UNIT.targetedUnit = -1
+			elif isinstance(UNIT, Artillery):
+				if UNIT.targetedCoord != [-1, -1]:
+					Event0.eventAdd("EventUnitAttack", UNIT)
+					UNIT.targetedCoord = [-1, -1]
+		
 		for event in self.EVENTQUEUE:
 			event[0].execute()
 		del self.EVENTQUEUE[0:len(self.EVENTQUEUE)]
@@ -97,13 +115,17 @@ class EventUnitMove(GameEvent):
 		Unit0.unitMove()
 
 class EventUnitAttack(GameEvent):
-	def __init__(self, Units):
-		self.attackingUnit = Units[0]
-		self.targetedUnit = Units[1]
+	def __init__(self, data):
+		self.attackingUnit = data
 	
 	def execute(self):
 		print("A unit is under attack!")
-		Unit0.unitAttack(self.attackingUnit, self.targetedUnit)
+		if isinstance(self.attackingUnit, Tank):
+			self.attackingUnit.targetedUnit.statHealth -= self.attackingUnit.statDamage
+		if isinstance(self.attackingUnit, Artillery):
+			targetedUnit = Map0.mapGetUnit(self.attackingUnit.targetedCoord)
+			if targetedUnit != -1:
+				self.targetedUnit.statHealth -= self.attackingUnit.statDamage
 
 class InputManager(object):		#TODO: input binds for separate input states
 	inputState = ['moveSelection', 'unitSelected', 'unitAttack']
@@ -136,15 +158,16 @@ class InputManager(object):		#TODO: input binds for separate input states
 						Unit0.unitSelect()
 						if Unit0.SELECTEDUNIT != -1:	self.setState(1)
 						else:							Event0.eventHandle()
+					elif event.key == K_z:		Event0.eventUndo()
 			elif self.getState() == 'unitSelected':
 				if event.type == KEYDOWN:
 					if event.key == K_ESCAPE:	self.setState(0)
-					elif event.key == K_e:		Event0.eventHandle()
 					elif event.key == K_a:		self.setState(2)
+					elif event.key == K_z:		Event0.eventUndo()
 			elif self.getState() == 'unitAttack':
 				if event.type == KEYDOWN:
 					if event.key == K_ESCAPE:	self.setState(1)
-					elif event.key == K_e:		Event0.eventAdd("EventUnitAttack", 0)
+					elif event.key == K_e:		Unit0.SELECTEDUNIT.unitAttack()
 
 	def terminate(self):
 		print("Terminated.")
@@ -199,13 +222,29 @@ class DrawingManager(object):
 				toY = MOVE[num][1]*self.CELLSIZE + self.CELLSIZE/2
 				pygame.draw.line(self.DISPLAYSURF, self.LIGHTBLUE, (X, Y), (toX, toY))
 	
-	def screenDrawPossiblePath(self, coord, limit, color):
+	def screenDrawPossiblePath(self, coord, limit):
 		Map0.mapGetPossiblePath(coord, limit)
 		for i in range(1, len(Map0.FRONTIER)):
-			toX = Map0.FRONTIER[i][0]*self.CELLSIZE+self.CELLSIZE/2
-			toY = Map0.FRONTIER[i][1]*self.CELLSIZE+self.CELLSIZE/2
-			pygame.draw.line(self.DISPLAYSURF, color, (toX-2, toY-2), (toX+2, toY+2))
+			toX = Map0.FRONTIER[i][0]*self.CELLSIZE + self.CELLSIZE/2
+			toY = Map0.FRONTIER[i][1]*self.CELLSIZE + self.CELLSIZE/2
+			pygame.draw.line(self.DISPLAYSURF, self.LIGHTBLUE, (toX-2, toY-2), (toX+2, toY+2))
 	
+	def screenDrawFireRange(self, coord, limit):
+		for i in range(-limit, limit+1):
+			if i > 0:
+				toX1 = (coord[0] + limit-i)*self.CELLSIZE + self.CELLSIZE/2
+				toX2 = (coord[0] - limit+i)*self.CELLSIZE + self.CELLSIZE/2
+				toY = (coord[1] + i)*self.CELLSIZE + self.CELLSIZE/2
+			if i < 0:
+				toX1 = (coord[0] + limit+i)*self.CELLSIZE + self.CELLSIZE/2
+				toX2 = (coord[0] -limit-i)*self.CELLSIZE + self.CELLSIZE/2
+				toY = (coord[1] + i)*self.CELLSIZE + self.CELLSIZE/2
+			if i == 0:
+				toX1 = (coord[0] + limit)*self.CELLSIZE + self.CELLSIZE/2
+				toX2 = (coord[0] -limit)*self.CELLSIZE + self.CELLSIZE/2
+				toY = coord[1]*self.CELLSIZE + self.CELLSIZE/2
+			pygame.draw.line(self.DISPLAYSURF, self.RED, (toX1+2, toY-2), (toX1-2, toY+2))
+			pygame.draw.line(self.DISPLAYSURF, self.RED, (toX2+2, toY-2), (toX2-2, toY+2))
 	
 	def screenRefresh(self):
 		self.DISPLAYSURF.fill(self.BGCOLOR)
@@ -214,20 +253,24 @@ class DrawingManager(object):
 		self.screenDrawMovement()
 		for UNIT in Unit0.UNITARRAY:
 			UNIT.drawUnit()
-		#if Unit0.SELECTEDUNIT != -1:
-		#	self.screenDrawPossiblePath(Unit0.SELECTEDUNIT.statCoord, Unit0.SELECTEDUNIT.statSpeed, self.LIGHTBLUE)
-		#	self.screenDrawPossiblePath(Unit0.SELECTEDUNIT.statCoord, Unit0.SELECTEDUNIT.statFR, self.RED)
-		if Map0.mapGetUnit() != -1:
-			self.screenDrawPossiblePath(Map0.mapGetUnit().statCoord, Map0.mapGetUnit().statSpeed, self.LIGHTBLUE)
-			self.screenDrawPossiblePath(Map0.mapGetUnit().statCoord, Map0.mapGetUnit().statFR, self.RED)
+		if Map0.mapGetUnit(Map0.MAPSELECT.statCoord) != -1:
+			unit = Map0.mapGetUnit(Map0.MAPSELECT.statCoord)
+			self.screenDrawPossiblePath(unit.statCoord, unit.statSpeed)
+			self.screenDrawFireRange(unit.statCoord, unit.statFR)
 		self.screenDrawSelect()
 		pygame.display.update()
 	
 	def screenConfig(self):
-		self.FPS = 10
-		self.WINDOWWIDTH = 640
-		self.WINDOWHEIGHT = 480
-		self.CELLSIZE = 20
+		config = open("config.txt", "r")
+		for line in config:
+			if "FPS = " in line:
+				self.FPS = float(line[6:9])
+			elif "WINDOWWIDTH = " in line:
+				self.WINDOWWIDTH = int(line[14:18])
+			elif "WINDOWHEIGHT = " in line:
+				self.WINDOWHEIGHT = int(line[15:19])
+			elif "CELLSIZE = " in line:
+				self.CELLSIZE = int(line[11:15])
 		
 		assert self.WINDOWWIDTH % self.CELLSIZE == 0
 		assert self.WINDOWHEIGHT % self.CELLSIZE == 0
@@ -255,6 +298,10 @@ class MapManager(object):
 	
 	def __init__(self):
 		self.MAPSELECT = Unit()
+		self.MOARRAY.append([1, 2])
+		self.MOARRAY.append([3, 2])
+		self.MOARRAY.append([1, 4])
+		self.MOARRAY.append([3, 4])
 		self.mapGenerateGraph()
 	
 	def mapGenerateGraph(self):
@@ -270,30 +317,32 @@ class MapManager(object):
 				if Y - 1 >= 0  and [X, Y-1] not in self.MOARRAY:
 					self.NEIGHBOURS[X, Y].append([X, Y-1])
 	
-	def mapGetUnit(self):
+	def mapGetUnit(self, coord):
 		for UNIT in Unit0.UNITARRAY:
-			if UNIT.statCoord == self.MAPSELECT.statCoord:
+			if UNIT.statCoord == coord:
 				return UNIT
 		return -1
 	
-	def mapGetPossiblePath(self, coord, limit):	#TODO: fix the "if"
+	def mapGetPossiblePath(self, coord, limit):	#this doesn't work properly
 		frontier = [[coord[0], coord[1]]]
 		visited = {}
-		visited[frontier[0][0], frontier[0][1]] = True
+		visited[coord[0], coord[1]] = True
 		flagBreak = False
 		
 		while not flagBreak:
-			if abs(frontier[0][0]) >= abs(coord[0])-limit+1 and abs(frontier[0][1]) >= abs(coord[1])-limit+1:
-				current = frontier[0]
-				del frontier[0]
+			current = frontier[0]
+			del frontier[0]
+			if current[0] > coord[0]-limit and current[0] < coord[0]+limit and current[1] > coord[1]-limit and current[1] < coord[1]+limit:
 				for next in self.NEIGHBOURS[current[0], current[1]]:
 					if not visited.has_key((next[0], next[1])):
 						frontier.append(next)
 						visited[next[0], next[1]] = True
-			else:
-				frontier.append([coord[0]+limit, coord[1]])
+			else:	#some ducttape, needs fixing
+				frontier.append([current[0], current[1]])
 				flagBreak = True
 		self.FRONTIER = frontier
+		
+	
 
 class UnitManager(object):
 	UNITARRAY = []
@@ -335,6 +384,8 @@ class UnitManager(object):
 			pass
 		elif [X+toX, Y+toY] in self.MOVEQUEUE[Position]:
 			pass
+		elif moveLength >= self.SELECTEDUNIT.statSpeed:
+			pass
 		elif [X+toX, Y+toY] not in Map0.MOARRAY:
 			self.MOVEQUEUE[Position].append([X+toX, Y+toY])
 	
@@ -367,12 +418,12 @@ class UnitManager(object):
 			self.MOVEQUEUE[UNIT.arrayPos][0] = [UNIT.statCoord[0], UNIT.statCoord[1]]
 			del self.MOVEQUEUE[UNIT.arrayPos][1:len(self.MOVEQUEUE[UNIT.arrayPos])]
 	
-	def unitAttack(self, attackingUnit, targetedUnit):
-		if isinstance(attackingUnit, Tank) or isinstance(attackingUnit, Artillery):
-			targetedUnit.statHealth -= attackingUnit.statDamage
+	#def unitAttack(self, attackingUnit, targetedUnit):
+	#	if isinstance(attackingUnit, Tank) or isinstance(attackingUnit, Artillery):
+	#		targetedUnit.statHealth -= attackingUnit.statDamage
 	
 	def unitSelect(self):
-		self.SELECTEDUNIT = Map0.mapGetUnit()
+		self.SELECTEDUNIT = Map0.mapGetUnit(Map0.MAPSELECT.statCoord)
 		
 class Unit(object):
 	statCoord = [0, 0]
@@ -396,17 +447,31 @@ class Scout(Unit):
 class Tank(Unit):
 	statFR = 4
 	statAmmoCap = 10
+	targetedUnit = -1
 	
 	def drawUnit(self):
 		outerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+1, self.statCoord[1]*Window0.CELLSIZE+1, Window0.CELLSIZE -1, Window0.CELLSIZE -1)
 		innerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+5, self.statCoord[1]*Window0.CELLSIZE+5, Window0.CELLSIZE -9, Window0.CELLSIZE -9)
 		pygame.draw.rect(Window0.DISPLAYSURF, Window0.DARKRED, outerRect)
 		pygame.draw.rect(Window0.DISPLAYSURF, Window0.RED, innerRect)
+		
+	def unitAttack(self):
+		if self.statAmmoCap != 0:
+			targetedUnit = Map0.mapGetUnit(Map0.MAPSELECT.statCoord)
+			if targetedUnit != -1 and targetedUnit != Unit0.SELECTEDUNIT:
+				X = Unit0.SELECTEDUNIT.statCoord[0]
+				Y = Unit0.SELECTEDUNIT.statCoord[1]
+				toX = targetedUnit.statCoord[0]
+				toY = targetedUnit.statCoord[1]
+				if abs(X-toX)+abs(Y-toY) <= Unit0.SELECTEDUNIT.statFR:
+					Unit0.SELECTEDUNIT.targetedUnit = targetedUnit
+					Input0.setState(1)
 
 class Artillery(Unit):
 	statMinFR = 1
 	statMaxFR = 10
 	statAmmoCap = 10
+	targetedCoord = [-1, -1]
 	
 	def drawUnit(self):
 		outerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+1, self.statCoord[1]*Window0.CELLSIZE+1, Window0.CELLSIZE -1, Window0.CELLSIZE -1)
@@ -443,8 +508,6 @@ class Main(object):
 		Event0.eventAdd("EventUnitCreate", ("Tank", [1, 1]))
 		Event0.eventAdd("EventUnitCreate", ("Tank", [3, 1]))
 		Event0.eventHandle()
-		Map0.MOARRAY.append([1, 2])
-		Map0.MOARRAY.append([3, 2])
 		#Event0.eventAdd("EventTerminate")		#in case things go wrong
 
 StartShenanigans = Main()

@@ -1,17 +1,17 @@
 main #runs the entire game
 ->coupled with everything
-+main cycle
-+management classes' initializations
-+(?) game state machine #so basically it describes the turn "playback" as well as it definds "binds"
+	+main cycle
+	+management classes' initializations
+	+(?) game state machine #so basically it describes the turn "playback" as well as it definds "binds"
 
 unit management class #controls the selection, adding/removing units, etc.
 -> drawing management
 -> map management
-+create unit
-+destroy unit
-+move unit #stores and executes unit's movement
-+(?)draw unit #get a unit type from the unit and draws its pattern
--movement queue #have a huge array for every unit on the map, needs to be carefully managed
+	+create unit
+	+destroy unit
+	+move unit #stores and executes unit's movement
+	+(?)draw unit #get a unit type from the unit and draws its pattern
+	-movement queue #have a huge array for every unit on the map, needs to be carefully managed
 
 drawing management class #so window drawing and unit drawin is separate? make the drawing heirarcy
 -> unit management
@@ -22,42 +22,67 @@ input management class #keyboard, mouse management, command pattern is king
 -> unit management
 -> map management
 -> gui
-+manages inputs from keyboard and sends it elsewhere
-+has input states
+	+manages inputs from keyboard and sends them elsewhere
+	+has input states
 
 gui class #supposed to be separate from the drawing management class
 -> drawing management
 -> input management
 -> (?) map class #it's part of GUI, selection and everything, but merging the two is a bad idea
-+ties user interface to the interactions #duh
+	+ties user interface to the interactions #duh
 
 map management class #returns the infomation about particular things being in particular places
 -> (?) gui
 -> unit management
 -> input management
 -> (?) drawing management#partially and more from a gui standpoint
-+can get you a unit
-+can find a proper limits for the unit's movement	#use a VO list and place all VOs in there
-+can place and calculate the field of view
+	+can get you a unit
+	+can find a proper limits for the unit's movement	#use a VO list and place all VOs in there
+	+can place and calculate the field of view
+	-Movement Obstacle array
+	-Vision Obstacle array
 
 unit class
 -> drawing pattern of a specific unit
 -> unit management
--stats (health, armor, speed, damage)
--active buff/debuff
--movement queue #i will probably move it to the unit management and create one huge queue fore everyone
+	-stats (health, armor, speed, damage, AC, FR, VR)
+	-active buff/debuff #just a list that autoresolves in the end of the turn
+	-movement queue #i will probably move it to the unit management and create one huge queue fore everyone
 
 ###
 
-game events:	#here's a fair question - how far shoulf i go with these
-- (?)terminate	#i don't think i needed this to begin with
-- unitMove
-- unitAttack
-- unitCreate
-- unitDestroy
-- unitUseAbility
+game events:	#exclusively unit interactions
+	- (?)terminate	#i don't think i needed this to begin with
+	- unitMove
+	- unitAttack
+	- unitCreate
+	- unitDestroy
+	- unitUseAbility
+	- unitHealthCheck
+	- unitAbilityCheck
 
-input states:	#unitSelect event will switch those around, the question is how
--selection movement
--unit movement
--unit attack
+input states:	#some game event are able to switch those around
+	-selection movement
+	-unit movement
+	-unit attack
+
+###
+
+TODO:
+	= draw an attack line for each attacking action
+	= fix the condition in the pathfinder
+	= field of view(add FOV calculation, define VO, get it all cowork with 
+		the map)
+	#= look up how to do GUI
+	= implement some existing units and add abilities some abilities
+	#= figure out proper stats for units
+
+DONE:
+	= moved unitAttack function to the unit itself
+	= changed the EventUnitAttack to add itself just before the event handling, 
+		so the target of the attack could be overwritten at any time
+	= added a proper FR illustration of a unit
+	= fixed movement limitations
+	= fixed map graph generator not recognising MOs
+	= added the "UNDO" option to game events (removes the last added one to 
+		the event queue or clears the movequeue of the selected unit)
