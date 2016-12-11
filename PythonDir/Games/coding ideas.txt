@@ -61,7 +61,7 @@ game events:	#exclusively unit interactions
 	- unitHealthCheck
 	- unitAbilityCheck
 
-input states:	#some game event are able to switch those around
+input states:	#some game events are able to switch those around
 	-selection movement
 	-unit movement
 	-unit attack
@@ -69,20 +69,17 @@ input states:	#some game event are able to switch those around
 ###
 
 TODO:
-	= draw an attack line for each attacking action
-	= fix the condition in the pathfinder
+	= look up how movement is handled in Atlas Reactor, cause i'm quite 
+		dumbfounded with what to do with the movement limitations
+	#= fix movement limitations (so you won't be able to move over other 
+		unit's starting and final positions)
 	= field of view(add FOV calculation, define VO, get it all cowork with 
 		the map)
 	#= look up how to do GUI
-	= implement some existing units and add abilities some abilities
+	= implement some existing units and add their abilities
 	#= figure out proper stats for units
 
 DONE:
-	= moved unitAttack function to the unit itself
-	= changed the EventUnitAttack to add itself just before the event handling, 
-		so the target of the attack could be overwritten at any time
-	= added a proper FR illustration of a unit
-	= fixed movement limitations
-	= fixed map graph generator not recognising MOs
-	= added the "UNDO" option to game events (removes the last added one to 
-		the event queue or clears the movequeue of the selected unit)
+	= fixed attacking function
+	= added an attack line illustration between an attacking unit and a targeted one
+	= fixed the pathfinder

@@ -64,11 +64,9 @@ class GameEventManager(object):
 			if isinstance(UNIT, Tank):
 				if UNIT.targetedUnit != -1:
 					Event0.eventAdd("EventUnitAttack", UNIT)
-					UNIT.targetedUnit = -1
 			elif isinstance(UNIT, Artillery):
 				if UNIT.targetedCoord != [-1, -1]:
 					Event0.eventAdd("EventUnitAttack", UNIT)
-					UNIT.targetedCoord = [-1, -1]
 		
 		for event in self.EVENTQUEUE:
 			event[0].execute()
@@ -121,11 +119,14 @@ class EventUnitAttack(GameEvent):
 	def execute(self):
 		print("A unit is under attack!")
 		if isinstance(self.attackingUnit, Tank):
+			#if self.attackingUnit.targetedUnit != -1:
 			self.attackingUnit.targetedUnit.statHealth -= self.attackingUnit.statDamage
+			self.attackingUnit.targetedUnit = -1
 		if isinstance(self.attackingUnit, Artillery):
 			targetedUnit = Map0.mapGetUnit(self.attackingUnit.targetedCoord)
 			if targetedUnit != -1:
-				self.targetedUnit.statHealth -= self.attackingUnit.statDamage
+				targetedUnit.statHealth -= self.attackingUnit.statDamage
+			self.attackingUnit.targetedCoord = [-1, -1]
 
 class InputManager(object):		#TODO: input binds for separate input states
 	inputState = ['moveSelection', 'unitSelected', 'unitAttack']
@@ -223,28 +224,40 @@ class DrawingManager(object):
 				pygame.draw.line(self.DISPLAYSURF, self.LIGHTBLUE, (X, Y), (toX, toY))
 	
 	def screenDrawPossiblePath(self, coord, limit):
-		Map0.mapGetPossiblePath(coord, limit)
-		for i in range(1, len(Map0.FRONTIER)):
-			toX = Map0.FRONTIER[i][0]*self.CELLSIZE + self.CELLSIZE/2
-			toY = Map0.FRONTIER[i][1]*self.CELLSIZE + self.CELLSIZE/2
+		frontier = Map0.mapGetPossiblePath(coord, limit)
+		for i in range(1, len(frontier)):
+			toX = frontier[i][0]*self.CELLSIZE + self.CELLSIZE/2
+			toY = frontier[i][1]*self.CELLSIZE + self.CELLSIZE/2
 			pygame.draw.line(self.DISPLAYSURF, self.LIGHTBLUE, (toX-2, toY-2), (toX+2, toY+2))
 	
 	def screenDrawFireRange(self, coord, limit):
-		for i in range(-limit, limit+1):
-			if i > 0:
-				toX1 = (coord[0] + limit-i)*self.CELLSIZE + self.CELLSIZE/2
-				toX2 = (coord[0] - limit+i)*self.CELLSIZE + self.CELLSIZE/2
-				toY = (coord[1] + i)*self.CELLSIZE + self.CELLSIZE/2
-			if i < 0:
-				toX1 = (coord[0] + limit+i)*self.CELLSIZE + self.CELLSIZE/2
-				toX2 = (coord[0] -limit-i)*self.CELLSIZE + self.CELLSIZE/2
-				toY = (coord[1] + i)*self.CELLSIZE + self.CELLSIZE/2
-			if i == 0:
-				toX1 = (coord[0] + limit)*self.CELLSIZE + self.CELLSIZE/2
-				toX2 = (coord[0] -limit)*self.CELLSIZE + self.CELLSIZE/2
-				toY = coord[1]*self.CELLSIZE + self.CELLSIZE/2
-			pygame.draw.line(self.DISPLAYSURF, self.RED, (toX1+2, toY-2), (toX1-2, toY+2))
-			pygame.draw.line(self.DISPLAYSURF, self.RED, (toX2+2, toY-2), (toX2-2, toY+2))
+		#abs(current[0]-coord[0])+abs(current[1]-coord[1]) < limit:
+		for i in range(0, 4*limit+1):
+			if i < 2*limit:		toX = coord[0]+i-limit
+			else:				toX = coord[0]+i-3*limit
+			if i < limit:						toY = coord[1]+i
+			elif i >= limit and i < 2*limit:	toY = coord[1]+2*limit-i
+			elif i > 2*limit and i < 3*limit:	toY = coord[1]-i+2*limit
+			else:								toY = coord[1]-4*limit+i
+			toX = toX*self.CELLSIZE + self.CELLSIZE/2
+			toY = toY*self.CELLSIZE + self.CELLSIZE/2
+			pygame.draw.line(self.DISPLAYSURF, self.RED, (toX+2, toY-2), (toX-2, toY+2))
+			
+	def screenDrawAttackLine(self, unit):
+		if isinstance(unit, Tank):
+			if unit.targetedUnit != -1:
+				X = unit.statCoord[0]*self.CELLSIZE + self.CELLSIZE/2
+				Y = unit.statCoord[1]*self.CELLSIZE + self.CELLSIZE/2
+				toX = unit.targetedUnit.statCoord[0]*self.CELLSIZE + self.CELLSIZE/2
+				toY = unit.targetedUnit.statCoord[1]*self.CELLSIZE + self.CELLSIZE/2
+				pygame.draw.line(self.DISPLAYSURF, self.RED, (X, Y), (toX, toY))
+		if isinstance(unit, Artillery):
+			if unit.targetedCoord != [-1, -1]:
+				X = unit.statCoord[0]*self.CELLSIZE + self.CELLSIZE/2
+				Y = unit.statCoord[1]*self.CELLSIZE + self.CELLSIZE/2
+				toX = unit.targetedCoord[0]*self.CELLSIZE + self.CELLSIZE/2
+				toY = unit.targetedCoord[1]*self.CELLSIZE + self.CELLSIZE/2
+				pygame.draw.line(self.DISPLAYSURF, self.RED, (X, Y), (toX, toY))
 	
 	def screenRefresh(self):
 		self.DISPLAYSURF.fill(self.BGCOLOR)
@@ -257,6 +270,7 @@ class DrawingManager(object):
 			unit = Map0.mapGetUnit(Map0.MAPSELECT.statCoord)
 			self.screenDrawPossiblePath(unit.statCoord, unit.statSpeed)
 			self.screenDrawFireRange(unit.statCoord, unit.statFR)
+			self.screenDrawAttackLine(unit)
 		self.screenDrawSelect()
 		pygame.display.update()
 	
@@ -294,7 +308,6 @@ class DrawingManager(object):
 class MapManager(object):
 	NEIGHBOURS = {}
 	MOARRAY = []
-	FRONTIER = []
 	
 	def __init__(self):
 		self.MAPSELECT = Unit()
@@ -328,21 +341,23 @@ class MapManager(object):
 		visited = {}
 		visited[coord[0], coord[1]] = True
 		flagBreak = False
+		#returnArray = []
 		
 		while not flagBreak:
 			current = frontier[0]
 			del frontier[0]
-			if current[0] > coord[0]-limit and current[0] < coord[0]+limit and current[1] > coord[1]-limit and current[1] < coord[1]+limit:
+			if abs(current[0]-coord[0])+abs(current[1]-coord[1]) < limit:
 				for next in self.NEIGHBOURS[current[0], current[1]]:
 					if not visited.has_key((next[0], next[1])):
 						frontier.append(next)
 						visited[next[0], next[1]] = True
+						#returnArray.append([next[0], next[1]])
 			else:	#some ducttape, needs fixing
 				frontier.append([current[0], current[1]])
+				frontier.append([frontier[0][0], frontier[0][1]])
+				#returnArray.append(self.NEIGHBOURS[coord[0], coord[1]][0])
 				flagBreak = True
-		self.FRONTIER = frontier
-		
-	
+		return frontier
 
 class UnitManager(object):
 	UNITARRAY = []
@@ -378,15 +393,11 @@ class UnitManager(object):
 		Y = self.MOVEQUEUE[Position][moveLength][1]
 		if [X+toX, Y+toY] == [self.MOVEQUEUE[Position][moveLength-1][0], self.MOVEQUEUE[Position][moveLength-1][1]]:
 			del self.MOVEQUEUE[Position][moveLength]
-		elif X+toX > Window0.CELLWIDTH or X+toX < 0:
-			pass
-		elif Y+toY > Window0.CELLHEIGHT or Y+toY < 0:
-			pass
 		elif [X+toX, Y+toY] in self.MOVEQUEUE[Position]:
 			pass
 		elif moveLength >= self.SELECTEDUNIT.statSpeed:
 			pass
-		elif [X+toX, Y+toY] not in Map0.MOARRAY:
+		elif [X+toX, Y+toY] in Map0.NEIGHBOURS[X, Y]:
 			self.MOVEQUEUE[Position].append([X+toX, Y+toY])
 	
 	def moveSelect(self, toX, toY):		#ducttape till I get the cursor support running
