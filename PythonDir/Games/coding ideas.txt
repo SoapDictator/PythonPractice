@@ -69,17 +69,20 @@ input states:	#some game events are able to switch those around
 ###
 
 TODO:
-	= look up how movement is handled in Atlas Reactor, cause i'm quite 
-		dumbfounded with what to do with the movement limitations
-	#= fix movement limitations (so you won't be able to move over other 
-		unit's starting and final positions)
-	= field of view(add FOV calculation, define VO, get it all cowork with 
-		the map)
-	#= look up how to do GUI
-	= implement some existing units and add their abilities
-	#= figure out proper stats for units
+	- fix field of view calculation
+	- add the "isVisible" field to Map Neighbours graph
+	- rewrite movement and attack conditions to use Map0.GetDistance
+	- fix the attack function to add the ability of undoing attack
+	- add mouse support
+	- add the resolve to movement actions (faster units take the spot 
+		and slower ones take a step back and the immobile units will 
+		stay where they are)
+	?- add auto-pathing for movement
+	#- look up how to do GUI
+	- implement some existing units and add their abilities
+	- figure out how to calculate the armor damage reduction properly 
+		(prob just going to make it decreased by plain numbers)
 
 DONE:
-	= fixed attacking function
-	= added an attack line illustration between an attacking unit and a targeted one
-	= fixed the pathfinder
+	= fixed the event manager not properly adding events to the queue
+	= fixed the artillery's attack function
