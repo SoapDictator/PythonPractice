@@ -70,13 +70,11 @@ input states:	#some game events are able to switch those around
 
 TODO:
 	- fix field of view calculation
-	- add the "isVisible" field to Map Neighbours graph
-	- rewrite movement and attack conditions to use Map0.GetDistance
-	- fix the attack function to add the ability of undoing attack
-	- add mouse support
-	- add the resolve to movement actions (faster units take the spot 
-		and slower ones take a step back and the immobile units will 
-		stay where they are)
+	- add the turn structure (Preturn, First Half, Second Half, Postturn)
+	- add the team structure (and, therefore, friendly/enemy actions' conditions)
+	# - fix the attack function to add the ability of undoing attack
+	# - add mouse support
+	- separate the files and invent an interface to handle throwing managers around the files
 	?- add auto-pathing for movement
 	#- look up how to do GUI
 	- implement some existing units and add their abilities
@@ -84,5 +82,6 @@ TODO:
 		(prob just going to make it decreased by plain numbers)
 
 DONE:
-	= fixed the event manager not properly adding events to the queue
-	= fixed the artillery's attack function
+	= fixed the screenDrawFireRange function
+	= broke the filed of view calcualtion (this time it was dimond walls)
+	= added the moveResolveColision function, which determines the final position of the unit's movement

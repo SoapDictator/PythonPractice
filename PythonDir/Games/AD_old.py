@@ -1,7 +1,11 @@
-#Artificially Destined
-#By SoapDictator
+#
+#================
+#|| Artificially Destined ||
+#================
+#by SoapDictator
+#
 
-import pygame, sys
+import pygame, sys, math
 from pygame.locals import *
 
 class GameEventManager(object):
@@ -68,8 +72,12 @@ class GameEventManager(object):
 		for event in self.EVENTQUEUE:
 			event[0].execute()
 		del self.EVENTQUEUE[0:len(self.EVENTQUEUE)]
+		
+		Unit0.unitCalculateVisibility()
 		print("------------")
 
+#------------------------------------------
+		
 class GameEvent(object):
 	def execute(self):
 		print("This is a prototype event, get out!")
@@ -118,7 +126,9 @@ class EventUnitAttack(GameEvent):
 				targetedUnit.statHealth -= self.attackingUnit.statDamage
 			self.attackingUnit.targetedCoord = [-1, -1]
 		print("A unit is (probably) under attack!")
-		
+
+#------------------------------------------
+
 class InputManager(object):		#TODO: input binds for separate input states
 	inputState = ['moveSelection', 'unitSelected', 'unitAttack']
 	inputDict = {inputState[0]:	['moveSelect'], 
@@ -165,7 +175,9 @@ class InputManager(object):		#TODO: input binds for separate input states
 		print("Terminated.")
 		pygame.quit()
 		sys.exit()
-	
+
+#------------------------------------------
+		
 class DrawingManager(object):
 	FPS = 0
 	FPSCLOCK = 0
@@ -204,7 +216,13 @@ class DrawingManager(object):
 		pygame.draw.line(self.DISPLAYSURF, self.GREEN, (lowX, topY), (lowX, lowY))
 		pygame.draw.line(self.DISPLAYSURF, self.GREEN, (lowX, lowY), (topX, lowY))
 		pygame.draw.line(self.DISPLAYSURF, self.GREEN, (topX, lowY), (topX, topY))
-			
+	
+	def screenDrawVisibility(self, unit):
+		for cell in unit.visibilityArray:
+			x = cell[0]*self.CELLSIZE + self.CELLSIZE/2
+			y = cell[1]*self.CELLSIZE + self.CELLSIZE/2
+			pygame.draw.line(self.DISPLAYSURF, self.WHITE, (x-1, y-1), (x+1, y+1))
+	
 	def screenDrawMovement(self):
 		for MOVE in Unit0.MOVEQUEUE:
 			for num in range(1, len(MOVE)):
@@ -258,14 +276,15 @@ class DrawingManager(object):
 			UNIT.drawUnit()
 		if Map0.mapGetUnit(Map0.MAPSELECT.statCoord) != -1:
 			unit = Map0.mapGetUnit(Map0.MAPSELECT.statCoord)
-			self.screenDrawPossiblePath(unit.statCoord, unit.statSpeed)
-			if isinstance(unit, Tank):
-				self.screenDrawFireRange(unit.statCoord, unit.statFR)
-			elif isinstance(unit, Artillery):
-				self.screenDrawFireRange(unit.statCoord, unit.statMaxFR)
-			self.screenDrawAttackLine(unit)
-		for UNIT in Unit0.UNITARRAY:
-			self.screenDrawAttackLine(UNIT)
+			#self.screenDrawPossiblePath(unit.statCoord, unit.statSpeed)
+			self.screenDrawVisibility(unit)
+			# if isinstance(unit, Tank):
+				# self.screenDrawFireRange(unit.statCoord, unit.statFR)
+			# elif isinstance(unit, Artillery):
+				# self.screenDrawFireRange(unit.statCoord, unit.statMaxFR)
+			# self.screenDrawAttackLine(unit)
+		# for UNIT in Unit0.UNITARRAY:
+			# self.screenDrawAttackLine(UNIT)
 		self.screenDrawSelect()
 		pygame.display.update()
 	
@@ -300,16 +319,19 @@ class DrawingManager(object):
 		self.LIGHTGRAY	= (120, 120, 120)
 		self.BGCOLOR	= self.BLACK
 
+#------------------------------------------
+		
 class MapManager(object):
 	NEIGHBOURS = {}
 	MOARRAY = []
+	VOARRAY = []
 	
 	def __init__(self):
 		self.MAPSELECT = Unit()
-		self.MOARRAY.append([1, 2])
+		self.MOARRAY.append([3, 0])
 		self.MOARRAY.append([3, 2])
-		self.MOARRAY.append([1, 4])
 		self.MOARRAY.append([3, 4])
+		self.MOARRAY.append([3, 6])
 		self.mapGenerateGraph()
 	
 	def mapGenerateGraph(self):
@@ -331,6 +353,10 @@ class MapManager(object):
 				return UNIT
 		return -1
 	
+	def mapGetDistance(self, origin, target):
+		#return math.sqrt(math.pow(abs(target[0]-origin[0]), 2) + math.pow(abs(target[1]-origin[1]), 2))	#true distance
+		return abs(target[0]-origin[0]) + abs(target[1]-origin[1])	#calculates how many non-diagonal steps it will take to get from origin to target
+	
 	def mapGetPossiblePath(self, coord, limit):	#this doesn't work properly
 		frontier = [[coord[0], coord[1]]]
 		visited = {}
@@ -341,7 +367,7 @@ class MapManager(object):
 		while not flagBreak:
 			current = frontier[0]
 			del frontier[0]
-			if abs(current[0]-coord[0])+abs(current[1]-coord[1]) < limit:
+			if self.mapGetDistance(coord, current) < limit:
 				for next in self.NEIGHBOURS[current[0], current[1]]:
 					if not visited.has_key((next[0], next[1])):
 						frontier.append(next)
@@ -353,7 +379,163 @@ class MapManager(object):
 				#returnArray.append(self.NEIGHBOURS[coord[0], coord[1]][0])
 				flagBreak = True
 		return frontier
+		
+	def mapCalculateVisibility(self, origin, limit):
+		Visibility = MapVisibility()
+		del Visibility._setVisible[0:len(Visibility._setVisible)-1]
+		Visibility._setVisible.append([origin[0], origin[1]])
+		for octant  in range(0, 8):
+			Visibility.Compute(octant, origin, limit, 1, Slope(1, 1), Slope(1, 0))
+		return Visibility._setVisible[0:len(Visibility._setVisible)-1]
+		
+class MapVisibility(object):
+	_setVisible  = [];
+	
+	def Compute(self, octant, origin, limit, x, top, bottom):
+		for x in range(x, limit):
+			topY = 0
+			if top.X == 1:
+				topY = x
+			else:
+				topY = ((x*2-1) * top.Y + top.X) / (top.X*2)
+				if self.BlocksLight(x, topY, origin, octant):
+					if top.GreaterOrEqual(x*2, topY*2+1) and  not self.BlocksLight(x, topY+1, origin, octant):
+						topY += 1
+				else:
+					ax = x*2
+					if self.BlocksLight(x+1, topY+1, origin, octant):
+						ax += 1
+					if top.Greater(ax, topY*2+1):
+						topY += 1
+			
+			bottomY = 0
+			if bottom.Y == 0:
+				bottomY = 0
+			else:
+				bottomY = ((x*2-1) * bottom.Y + bottom.X) / (bottom.X*2)
+				if bottom.GreaterOrEqual(x*2, bottomY*2+1) and self.BlocksLight(x, bottomY, origin, octant) and  not self.BlocksLight(x, bottomY+1, origin, octant):
+					bottomY += 1
+					
+			wasOpaque = -1
+			for y in reversed(range(bottomY, topY+1)):
+				if limit < 0 or Map0.mapGetDistance(origin, [x, y]) <= limit:
+					isOpaque = self.BlocksLight(x, y, origin, octant)
+					isVisible = ((y != topY or top.GreaterOrEqual(x, y)) and (y != bottomY or bottom.LessOrEqual(x, y)))
+					if isVisible:
+						self.SetVisible(x, y, origin, octant)
+					
+					if x != limit:
+						if isOpaque:
+							if wasOpaque == 0:
+								nx = x*2
+								ny = y*2+1
+								if self.BlocksLight(x, y+1, origin, octant):
+									nx -= 1
+								if top.Greater(nx, ny):
+									if y == bottomY:
+										bottom = Slope(nx, ny)
+										break
+									else:
+										self.Compute(octant, origin, limit, x+1, top, Slope(nx, ny))
+								else:
+									if y == bottomY:
+										return 0
+							wasOpaque = 1
 
+						else:
+							if wasOpaque >= 0:
+								nx = x*2
+								ny = y*2+1
+								#if BlocksLight(x+1, y+1, octant, origin): 
+								#	nx++
+								if bottom.GreaterOrEqual(nx, ny): 
+									return 0
+								top = Slope(nx, ny)
+							wasOpaque = 0
+
+			if wasOpaque != 0:
+				break
+	
+	def BlocksLight(self, x, y, origin, octant):
+		nx = origin[0]
+		ny = origin[1]
+		if octant == 0:
+			nx += x
+			ny -= y
+		elif octant == 1: 
+			nx += y
+			ny -= x
+		elif octant == 2:
+			nx -= y
+			ny -= x
+		elif octant == 3:
+			nx -= x
+			ny -= y
+		elif octant == 4:
+			nx -= x
+			ny += y
+		elif octant == 5:
+			nx -= y
+			ny += x
+		elif octant == 6:
+			nx += y
+			ny += x
+		elif octant == 7:
+			nx += x
+			ny += y
+		return [nx, ny] in Map0.MOARRAY
+		
+	def SetVisible(self, x, y, origin, octant):
+		nx = origin[0]
+		ny = origin[1]
+		if octant == 0:
+			nx += x
+			ny -= y
+		elif octant == 1: 
+			nx += y
+			ny -= x
+		elif octant == 2:
+			nx -= y
+			ny -= x
+		elif octant == 3:
+			nx -= x
+			ny -= y
+		elif octant == 4:
+			nx -= x
+			ny += y
+		elif octant == 5:
+			nx -= y
+			ny += x
+		elif octant == 6:
+			nx += y
+			ny += x
+		elif octant == 7:
+			nx += x
+			ny += y
+		self._setVisible.append([nx, ny])
+		
+class Slope(object):
+	X = -1
+	Y = -1
+	
+	def __init__(self, x, y):
+		self.X = x
+		self.Y = y
+	
+	def Greater(self, x, y):
+		return self.Y*x > self.X*y
+		
+	def GreaterOrEqual(self, x, y):
+		return self.Y*x >= self.X*y
+		
+	def Less(self, x, y):
+		return self.Y*x < self.X*y
+		
+	def LessOrEqual(self, x, y):
+		return self.Y*x <= self.X*y
+
+#------------------------------------------
+		
 class UnitManager(object):
 	UNITARRAY = []
 	MOVEQUEUE = []
@@ -434,6 +616,15 @@ class UnitManager(object):
 	def unitSelect(self):
 		self.SELECTEDUNIT = Map0.mapGetUnit(Map0.MAPSELECT.statCoord)
 		
+	def unitCalculateVisibility(self):
+		for UNIT in self.UNITARRAY:
+			result = Map0.mapCalculateVisibility(UNIT.statCoord, UNIT.statVR)
+			print(result)
+			del UNIT.visibilityArray[0:len(UNIT.visibilityArray)-1]
+			UNIT.visibilityArray = result
+
+#------------------------------------------
+		
 class Unit(object):
 	statCoord = [0, 0]
 	statHealth = 10
@@ -442,6 +633,7 @@ class Unit(object):
 	statSpeed = 5
 	statVR = 6
 	arrayPos = 0
+	visibilityArray = []
 	
 	def drawUnit(self):
 		pass
@@ -508,6 +700,8 @@ class Engineer(Unit):
 		pygame.draw.rect(Window0.DISPLAYSURF, Window0.DARKRED, outerRect)
 		pygame.draw.rect(Window0.DISPLAYSURF, Window0.RED, innerRect)
 
+#------------------------------------------
+		
 class Main(object):
 	def __init__(self):
 		global Event0, Window0, Input0, Unit0, Map0
@@ -525,10 +719,9 @@ class Main(object):
 			Window0.FPSCLOCK.tick(Window0.FPS)
 	
 	def test(self):
-		Event0.eventAdd("EventUnitCreate", ("Tank", [1, 1]))
-		Event0.eventAdd("EventUnitCreate", ("Artillery", [3, 1]))
-		Event0.eventAdd("EventUnitCreate", ("Tank", [5, 1]))
+		Event0.eventAdd("EventUnitCreate", ("Tank", [1, 3]))
+		#Event0.eventAdd("EventUnitCreate", ("Artillery", [3, 1]))
+		#Event0.eventAdd("EventUnitCreate", ("Tank", [5, 1]))
 		Event0.eventHandle()
-		#Event0.eventAdd("EventTerminate")		#in case things go wrong
 
 StartShenanigans = Main()
