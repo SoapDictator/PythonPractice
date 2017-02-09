@@ -121,7 +121,7 @@ class EventUnitAttack(GameEvent):
 				self.attackingUnit.targetedUnit.statHealth -= self.attackingUnit.statDamage
 				self.attackingUnit.targetedUnit = -1
 		elif isinstance(self.attackingUnit, Artillery):
-			targetedUnit = Map0.mapGetUnit(self.attackingUnit.targetedCoord)
+			targetedUnit = Map0.getUnit(self.attackingUnit.targetedCoord)
 			if targetedUnit != -1:
 				targetedUnit.statHealth -= self.attackingUnit.statDamage
 			self.attackingUnit.targetedCoord = [-1, -1]
@@ -129,8 +129,9 @@ class EventUnitAttack(GameEvent):
 
 #------------------------------------------
 
-class InputManager(object):		#TODO: input binds for separate input states
-	inputState = ['moveSelection', 'unitSelected', 'unitAttack']
+#Needs an overhaul since i use hexes now
+class InputManager(object):
+	inputState = ['moveSelection', 'unitSelected', 'unitTargetChange']
 	inputDict = {inputState[0]:	['moveSelect'], 
 				 inputState[1]:	['moveStore'], 
 				 inputState[2]:	['moveSelect']}
@@ -166,10 +167,10 @@ class InputManager(object):		#TODO: input binds for separate input states
 					if event.key == K_ESCAPE:	self.setState(0)
 					elif event.key == K_a:		self.setState(2)
 					elif event.key == K_z:		Event0.eventUndo()
-			elif self.getState() == 'unitAttack':
+			elif self.getState() == 'unitTargetChange':
 				if event.type == KEYDOWN:
 					if event.key == K_ESCAPE:	self.setState(1)
-					elif event.key == K_e:		Unit0.SELECTEDUNIT.unitAttack()
+					elif event.key == K_e:		Unit0.SELECTEDUNIT.unitTargetChange()
 
 	def terminate(self):
 		print("Terminated.")
@@ -196,99 +197,85 @@ class DrawingManager(object):
 		self.BASICFONT = pygame.font.Font('freesansbold.ttf', 18)
 		pygame.display.set_caption('AD')
 		
-	def screenDrawGrid(self):
-		for x in range(0, self.WINDOWWIDTH, self.CELLSIZE):	# draw vertical lines
-			pygame.draw.line(self.DISPLAYSURF, self.LIGHTGRAY, (x, 0), (x, self.WINDOWHEIGHT))
-		for y in range(0, self.WINDOWHEIGHT, self.CELLSIZE):	# draw horizontal lines
-			pygame.draw.line(self.DISPLAYSURF, self.LIGHTGRAY, (0, y), (self.WINDOWWIDTH, y))
-	
-	def screenDrawVO(self):
-		for VO in Map0.MOARRAY:
-			pygame.draw.rect(self.DISPLAYSURF, self.LIGHTGRAY, pygame.Rect(VO[0]*self.CELLSIZE+1, VO[1]*self.CELLSIZE+1, self.CELLSIZE -1, self.CELLSIZE -1))
-	
-	def screenDrawSelect(self):
-		outerRect = pygame.Rect(Map0.MAPSELECT.statCoord[0], Map0.MAPSELECT.statCoord[1], self.CELLSIZE, self.CELLSIZE)
-		topX = Map0.MAPSELECT.statCoord[0]*self.CELLSIZE
-		topY = Map0.MAPSELECT.statCoord[1]*self.CELLSIZE
-		lowX = Map0.MAPSELECT.statCoord[0]*self.CELLSIZE + self.CELLSIZE
-		lowY = Map0.MAPSELECT.statCoord[1]*self.CELLSIZE + self.CELLSIZE
-		pygame.draw.line(self.DISPLAYSURF, self.GREENYELLOW, (topX, topY), (lowX, topY))
-		pygame.draw.line(self.DISPLAYSURF, self.GREENYELLOW, (lowX, topY), (lowX, lowY))
-		pygame.draw.line(self.DISPLAYSURF, self.GREENYELLOW, (lowX, lowY), (topX, lowY))
-		pygame.draw.line(self.DISPLAYSURF, self.GREENYELLOW, (topX, lowY), (topX, topY))
-	
-	def screenDrawVisibility(self, unit):
-		for cell in unit.visibilityArray:
-			x = cell[0]*self.CELLSIZE + self.CELLSIZE/2
-			y = cell[1]*self.CELLSIZE + self.CELLSIZE/2
-			pygame.draw.line(self.DISPLAYSURF, self.WHITE, (x-1, y-1), (x+1, y+1))
-	
-	def screenDrawMovement(self):
-		for MOVE in Unit0.MOVEQUEUE:
-			for num in range(1, len(MOVE)):
-				X = MOVE[num-1][0]*self.CELLSIZE + self.CELLSIZE/2
-				Y = MOVE[num-1][1]*self.CELLSIZE + self.CELLSIZE/2
-				toX = MOVE[num][0]*self.CELLSIZE + self.CELLSIZE/2
-				toY = MOVE[num][1]*self.CELLSIZE + self.CELLSIZE/2
-				pygame.draw.line(self.DISPLAYSURF, self.LIGHTBLUE, (X, Y), (toX, toY))
-	
-	def screenDrawPossiblePath(self, coord, limit):
-		frontier = Map0.mapGetPossiblePath(coord, limit)
-		for i in range(1, len(frontier)):
-			toX = frontier[i][0]*self.CELLSIZE + self.CELLSIZE/2
-			toY = frontier[i][1]*self.CELLSIZE + self.CELLSIZE/2
-			pygame.draw.line(self.DISPLAYSURF, self.LIGHTBLUE, (toX-2, toY-2), (toX+2, toY+2))
-	
-	def screenDrawFireRange(self, coord, limit):
-		for i in range(0, 4*limit+1):
-			if i < 2*limit:							toX = coord[0]+i-limit
-			elif i > 2*limit:							toX = coord[0]+i-3*limit
+	def hextopixel(self, hex):
+		x = self.POINTCENTER[0] + self.CELLSIZE/2 * math.sqrt(3) * (hex[0] +hex[1]*0.5)
+		y = self.POINTCENTER[1] + self.CELLSIZE/2 * 1.5 * hex[1]
+		return [int(x), int(y)]
+		
+	def pixeltohex(self, pixelHex):
+		y = (pixelHex[1] - self.POINTCENTER[1]) / (self.CELLSIZE/2 * 1.5)
+		x = (pixelHex[0] - self.POINTCENTER[0]) / (self.CELLSIZE/2 * math.sqrt(3)) - y*0.5
+		return self.hexRound([x, y])
+		
+	def hexRound(self, hex):
+		rx = round(hex[0])
+		ry = round(-hex[0]-hex[1])
+		rz = round(hex[1])
+		
+		dx = abs(rx - hex[0])
+		dy = abs(ry + hex[0] + hex[1])
+		dz = abs(rz - hex[1])
+		
+		if dx > dy and dx > dz:
+			rx = -ry-rz
+		elif dy > dz:
+			#ry = -rx-rz
+			pass
+		else:
+			rz = -rx-ry
 			
-			if i < limit:								toY = coord[1]+i
-			elif i >= limit and i < 2*limit:	toY = coord[1]+2*limit-i
-			elif i > 2*limit and i < 3*limit:	toY = coord[1]-i+2*limit
-			else:										toY = coord[1]-4*limit+i
-			
-			toX = toX*self.CELLSIZE + self.CELLSIZE/2
-			toY = toY*self.CELLSIZE + self.CELLSIZE/2
-			pygame.draw.line(self.DISPLAYSURF, self.RED, (toX+2, toY-2), (toX-2, toY+2))
-			
-	def screenDrawAttackLine(self, unit):
-		if isinstance(unit, Tank):
-			if unit.targetedUnit != -1:
-				X = unit.statCoord[0]*self.CELLSIZE + self.CELLSIZE/2 + 1
-				Y = unit.statCoord[1]*self.CELLSIZE + self.CELLSIZE/2 + 1
-				toX = unit.targetedUnit.statCoord[0]*self.CELLSIZE + self.CELLSIZE/2 + 1
-				toY = unit.targetedUnit.statCoord[1]*self.CELLSIZE + self.CELLSIZE/2 + 1
-				pygame.draw.line(self.DISPLAYSURF, self.RED, (X, Y), (toX, toY))
-		if isinstance(unit, Artillery):
-			if unit.targetedCoord != [-1, -1]:
-				X = unit.statCoord[0]*self.CELLSIZE + self.CELLSIZE/2
-				Y = unit.statCoord[1]*self.CELLSIZE + self.CELLSIZE/2
-				toX = unit.targetedCoord[0]*self.CELLSIZE + self.CELLSIZE/2
-				toY = unit.targetedCoord[1]*self.CELLSIZE + self.CELLSIZE/2
-				pygame.draw.line(self.DISPLAYSURF, self.RED, (X, Y), (toX, toY))
+		return [rx, rz]
 	
+	#draws a single hex; width=1 will draw an outline, width=0 draws a solid figure
+	def drawHex(self, hex, color = [255, 255, 255], width = 1):
+		h = self.CELLSIZE
+		w = math.sqrt(3)/2 * h
+		directions_pixel = [[0, 0.5*h], [0.5*w, 0.25*h], [0.5*w, -0.25*h], 
+									[0, -0.5*h], [-0.5*w, -0.25*h], [-0.5*w, 0.25*h]]
+		pixelhex = self.hextopixel(hex)
+		points = []
+		
+		for i in range(0, 6):
+			points.append([pixelhex[0]+directions_pixel[i][0], 
+									pixelhex[1]+directions_pixel[i][1]])
+		pygame.draw.polygon(self.DISPLAYSURF, color, points, width)
+	
+	#draws a direct line from origin to target
+	def drawLine(self, origin, target, color = [255, 255, 255]):
+		pixelOrigin = self.hextopixel(origin)
+		pixelTarget = self.hextopixel(target)
+		
+		N = Map0.getDistance(origin, target)
+		pixelN = [pixelOrigin[0]-pixelTarget[0],pixelOrigin[1]-pixelTarget[1]]
+		if N != 0:	pixelDiv = [float(pixelN[0])/N, float(pixelN[1])/N]
+		else:		pixelDiv = [0, 0]
+		
+		pygame.draw.line(self.DISPLAYSURF, color, pixelOrigin, pixelTarget, 1)
+		for i in range(0, N+1):
+			X = pixelOrigin[0] - int(pixelDiv[0]*i)
+			Y = pixelOrigin[1] - int(pixelDiv[1]*i)
+			pygame.draw.circle(self.DISPLAYSURF, color, [X, Y], 3)
+		
+	def drawGrid(self, color = [255, 255, 255], width = 1):
+		for q in range(-self.MAPRADIUS, self.MAPRADIUS+1):
+			r1 = max(-self.MAPRADIUS, -q-self.MAPRADIUS)
+			r2 = min(self.MAPRADIUS, -q+self.MAPRADIUS)
+			
+			for r in range(r1, r2+1):
+				self.drawHex([q, r], color, width)
+
 	#draws EVERYTHING again on each frame
 	def screenRefresh(self):
 		self.DISPLAYSURF.fill(self.BGCOLOR)
-		self.screenDrawGrid()
-		self.screenDrawVO()
-		self.screenDrawMovement()
-		for UNIT in Unit0.UNITARRAY:
-			UNIT.drawUnit()
-		if Map0.mapGetUnit(Map0.MAPSELECT.statCoord) != -1:
-			unit = Map0.mapGetUnit(Map0.MAPSELECT.statCoord)
-			self.screenDrawPossiblePath(unit.statCoord, unit.statSpeed)
-			self.screenDrawVisibility(unit)
-			if isinstance(unit, Tank):
-				self.screenDrawFireRange(unit.statCoord, unit.statFR)
-			elif isinstance(unit, Artillery):
-				self.screenDrawFireRange(unit.statCoord, unit.statMinFR)
-				self.screenDrawFireRange(unit.statCoord, unit.statMaxFR)
-		for UNIT in Unit0.UNITARRAY:
-			self.screenDrawAttackLine(UNIT)
-		self.screenDrawSelect()
+		self.drawGrid([150, 150, 150], 0)
+		
+		#for hex in Map0.getLine(self.pixeltohex(pygame.mouse.get_pos()), [3, 0]):
+		#for hex in Map0.getRing(Map0.getDistance(self.pixeltohex(pygame.mouse.get_pos()), [0, 0]), width = 0):
+		for hex in Map0.getPath(self.MAPRADIUS, [0, 0], self.pixeltohex(pygame.mouse.get_pos())):
+			self.drawHex(hex, [120, 120, 255], 0)
+		self.drawGrid()
+		#self.drawLine(self.pixeltohex(pygame.mouse.get_pos()), [3, 0])
+		
 		pygame.display.update()
 	
 	#takes settings frrom config.txt
@@ -304,11 +291,15 @@ class DrawingManager(object):
 			elif "CELLSIZE = " in line:
 				self.CELLSIZE = int(line[11:15])
 		
-		assert self.WINDOWWIDTH % self.CELLSIZE == 0
-		assert self.WINDOWHEIGHT % self.CELLSIZE == 0
+		#assert self.WINDOWWIDTH % self.CELLSIZE == 0
+		#assert self.WINDOWHEIGHT % self.CELLSIZE == 0
 
 		self.CELLWIDTH = int(self.WINDOWWIDTH / self.CELLSIZE)
 		self.CELLHEIGHT = int(self.WINDOWHEIGHT / self.CELLSIZE)
+		
+		self.MAPRADIUS = 4
+		self.POINTCENTER = [(0.5+self.MAPRADIUS)*math.sqrt(3)/2*self.CELLSIZE, 
+										(0.5+self.MAPRADIUS*0.75)*self.CELLSIZE]
 	
 	def screenColors(self):
 		#								R		G		B
@@ -320,9 +311,9 @@ class DrawingManager(object):
 		self.GREEN				= (    0, 255,     0)
 		self.YELLOW			= (255, 255,     0)
 		self.GREENYELLOW	= (173, 255,   47)
-		self.LIGHTBLUE		= (  60,   60, 200)
+		self.LIGHTBLUE		= (  0,   150, 255)
 		self.LIGHTGRAY		= (120, 120, 120)
-		self.BGCOLOR	= self.BLACK
+		self.BGCOLOR	= [60, 60, 60]
 
 #------------------------------------------
 		
@@ -334,228 +325,92 @@ class MapManager(object):
 	def __init__(self):
 		self.MAPSELECT = Unit()
 		#this is currently the only way to add Movement Obsticles
-		self.MOARRAY.append([3, 0])
-		self.MOARRAY.append([3, 2])
-		self.MOARRAY.append([3, 4])
-		self.MOARRAY.append([3, 6])
-		self.mapGenerateGraph()
+		#self.MOARRAY.append([3, 0])
+		#self.MOARRAY.append([3, 2])
+		#self.MOARRAY.append([3, 4])
+		#self.MOARRAY.append([3, 6])
+		self.createNeighbours()
 	
 	#generates a graph of all possible transitions from one tile to another
-	def mapGenerateGraph(self):
-		for X in range(0, Window0.CELLWIDTH+1):
-			for Y in range(0, Window0.CELLHEIGHT+1):
-				self.NEIGHBOURS[X, Y] = []
-				if X + 1 <= Window0.CELLWIDTH and [X+1, Y] not in self.MOARRAY:
-					self.NEIGHBOURS[X, Y].append([X+1, Y])
-				if Y + 1 <= Window0.CELLHEIGHT  and [X, Y+1] not in self.MOARRAY:
-					self.NEIGHBOURS[X, Y].append([X, Y+1])
-				if X - 1 >= 0  and [X-1, Y] not in self.MOARRAY:
-					self.NEIGHBOURS[X, Y].append([X-1, Y])
-				if Y - 1 >= 0  and [X, Y-1] not in self.MOARRAY:
-					self.NEIGHBOURS[X, Y].append([X, Y-1])
+	def createNeighbours(self):
+		self.DIRECTIONS = [[-1, 0], [-1, +1], [0, +1],
+										[+1, 0], [+1, -1], [0, -1]]
 	
-	def mapGetUnit(self, coord):
+		for Q in range(-Window0.MAPRADIUS, Window0.MAPRADIUS+1):
+			for R in range(-Window0.MAPRADIUS, Window0.MAPRADIUS+1):
+				self.NEIGHBOURS[Q, R] = []
+				for hex in self.DIRECTIONS:
+					newHex = [Q+hex[0], R+hex[1]]
+					if self.getDistance(newHex, [0, 0]) <= Window0.MAPRADIUS and newHex not in self.MOARRAY:
+						self.NEIGHBOURS[Q, R].append([newHex[0], newHex[1]])
+	
+	#curently calculates distance in axial hexagonal coordinates
+	def getDistance(self, origin, target):
+		#true distance
+		#return math.sqrt(math.pow(abs(target[0]-origin[0]), 2) + math.pow(abs(target[1]-origin[1]), 2))
+		
+		#calculates how many non-diagonal steps it will take to get from origin to target
+		#return abs(target[0]-origin[0]) + abs(target[1]-origin[1])
+		
+		#calculates distance in axial hex coordinates
+		aq = origin[0]
+		ar = origin[1]
+		bq = target[0]
+		br = target[1]
+		return (abs(aq-bq) + abs(aq+ar-bq-br) + abs(ar-br))/2
+	
+	#returns all hexes on the line between the 2 points
+	def getLine(self, origin, target):
+		N = Map0.getDistance(origin, target)
+		if N != 0:	div = 1/float(N)
+		else:		div = 0
+		result = []
+		
+		for i in range(0, N+1):
+			Q =  float(origin[0]) + float(target[0] - origin[0]) * div * i
+			R = float(origin[1]) + float(target[1] - origin[1]) * div * i
+			result.append(Window0.hexRound([Q, R]))
+		return result
+	
+	#returns a hexes in a ring of a given radius; width=0 returns the entire circle
+	def getRing(self, limit, coord = [0, 0], width = 1):
+		frontier = [[coord[0], coord[1]]]
+		visited = {}
+		visited[coord[0], coord[1]] = None
+		flagBreak = False
+		
+		while not flagBreak:
+			current = frontier[0]
+			del frontier[0]
+			if self.getDistance(coord, current) < limit:
+				for next in self.NEIGHBOURS[current[0], current[1]]:
+					if not visited.has_key((next[0], next[1])):
+						frontier.append(next)
+						visited[next[0], next[1]] = [current[0], current[1]]
+			else:
+				frontier.append([current[0], current[1]])
+				flagBreak = True
+		if width == 1:
+			return frontier
+		elif width == 0:
+			return visited
+	
+	#returns a unit in a given coordiante if it's there, otherwise returns -1 int
+	def getUnit(self, coord):
 		for UNIT in Unit0.UNITARRAY:
 			if UNIT.statCoord == coord:
 				return UNIT
 		return -1
 	
-	def mapGetDistance(self, origin, target):
-		#true distance
-		#return math.sqrt(math.pow(abs(target[0]-origin[0]), 2) + math.pow(abs(target[1]-origin[1]), 2))
+	def getPath(self, limit, origin, target):
+		came_from = self.getRing(limit, origin, 0)
 		
-		#calculates how many non-diagonal steps it will take to get from origin to target
-		return abs(target[0]-origin[0]) + abs(target[1]-origin[1])
-	
-	#this is a half of a pathfinder (knows where to move, doesn't know how); currently used only to illustrate the movement limitations
-	def mapGetPossiblePath(self, coord, limit):
-		frontier = [[coord[0], coord[1]]]
-		visited = {}
-		visited[coord[0], coord[1]] = True
-		flagBreak = False
-		#returnArray = []
-		
-		while not flagBreak:
-			current = frontier[0]
-			del frontier[0]
-			if self.mapGetDistance(coord, current) < limit:
-				for next in self.NEIGHBOURS[current[0], current[1]]:
-					if not visited.has_key((next[0], next[1])):
-						frontier.append(next)
-						visited[next[0], next[1]] = True
-						#returnArray.append([next[0], next[1]])
-			else:	#some ducttape, needs fixing
-				frontier.append([current[0], current[1]])
-				frontier.append([frontier[0][0], frontier[0][1]])
-				#returnArray.append(self.NEIGHBOURS[coord[0], coord[1]][0])
-				flagBreak = True
-		return frontier
-	
-	#calculates the field of view using abstract values
-	def mapCalculateVisibility(self, origin, limit):
-		Visibility = MapVisibility()
-		del Visibility._setVisible[0:len(Visibility._setVisible)-1]
-		Visibility._setVisible.append([origin[0], origin[1]])
-		for octant  in range(0, 8):
-			Visibility.Compute(octant, origin, limit, 1, Slope(1, 1), Slope(1, 0))
-		return Visibility._setVisible[0:len(Visibility._setVisible)-1]
-
-#class for field of view calculation; currently broken
-class MapVisibility(object):
-	_setVisible  = [];
-	
-	def Compute(self, octant, origin, limit, x, top, bottom):
-		for x in range(x, limit):
-			topY = 0
-			if top.X == 1:
-				topY = x
-			else:
-				topY = ((x*2-1) * top.Y + top.X) / (top.X*2)
-				ay = (topY*2+1) * top.X
-				if BlocksLight(x, topY, origin, octant):
-					if top.GreaterOrEqual(x*2, ay):
-						topY = topY + 1
-				else:
-					if top.Greater(x*2+1, ay):
-						topY = topY + 1
-			
-			bottomY = 0
-			if bottom.Y == 0:
-				bottomY = 0
-			else:
-				bottomY = ((x*2-1) * bottom.Y + bottom.X) / (bottom.X*2)
-			
-			wasOpaque = -1
-			for y in reversed(range(bottomY, topY+1)):
-				tx = origin[0]
-				ty = origin[1]
-				if octant == 0:
-					tx += x
-					ty -= y
-				elif octant == 1: 
-					tx += y
-					ty -= x
-				elif octant == 2:
-					tx -= y
-					ty -= x
-				elif octant == 3:
-					tx -= x
-					ty -= y
-				elif octant == 4:
-					tx -= x
-					ty += y
-				elif octant == 5:
-					tx -= y
-					ty += x
-				elif octant == 6:
-					tx += y
-					ty += x
-				elif octant == 7:
-					tx += x
-					ty += y
-				
-				inRange = limit < 0 or Map0.mapGetDistance(origin, [x, y]) <= limit
-				if inRange and (y != topY or top.GreaterOrEqual(x, y)) and (y != bottomY or bottom.LessOrEqual(x, y)):
-					self.SetVisible(tx, ty, origin, octant)
-				
-				isOpaque = (not inRange) or self.BlocksLight(tx, ty, origin, octant)
-				if isOpaque and (y == topY and top.LessOrEqual(x*2, y*2-1) and (not self.BlocksLight(x, y-1, octant, origin)) or y == bottomY and bottom.GreaterOrEqual(x*2, y*2+1) and  (not self.BlocksLight(x, y+1, octant, origin))):
-					isOpaque = false
-				
-				if x != limit:
-					if isOpaque:
-						if wasOpaque == 0:
-							if  (not inRange) or y == bottomY:
-								bottom = Slope(x*2, y*2+1)
-								break
-							else:
-								Compute(octant, origin, limit, x+1, top, Slope(x*2, y*2+1))
-						wasOpaque = 1
-					else:
-						if wasOpaque > 0:
-							top = Slope(x*2, y*2+1)
-							wasOpaque = 0
-			
-			if wasOpaque != 0:
-				break
-	
-	def BlocksLight(self, x, y, origin, octant):
-		nx = origin[0]
-		ny = origin[1]
-		if octant == 0:
-			nx += x
-			ny -= y
-		elif octant == 1: 
-			nx += y
-			ny -= x
-		elif octant == 2:
-			nx -= y
-			ny -= x
-		elif octant == 3:
-			nx -= x
-			ny -= y
-		elif octant == 4:
-			nx -= x
-			ny += y
-		elif octant == 5:
-			nx -= y
-			ny += x
-		elif octant == 6:
-			nx += y
-			ny += x
-		elif octant == 7:
-			nx += x
-			ny += y
-		return [nx, ny] in Map0.MOARRAY
-		
-	def SetVisible(self, x, y, origin, octant):
-		nx = origin[0]
-		ny = origin[1]
-		if octant == 0:
-			nx += x
-			ny -= y
-		elif octant == 1: 
-			nx += y
-			ny -= x
-		elif octant == 2:
-			nx -= y
-			ny -= x
-		elif octant == 3:
-			nx -= x
-			ny -= y
-		elif octant == 4:
-			nx -= x
-			ny += y
-		elif octant == 5:
-			nx -= y
-			ny += x
-		elif octant == 6:
-			nx += y
-			ny += x
-		elif octant == 7:
-			nx += x
-			ny += y
-		self._setVisible.append([nx, ny])
-		
-class Slope(object):
-	X = -1
-	Y = -1
-	
-	def __init__(self, x, y):
-		self.X = x
-		self.Y = y
-
-	def Greater(self, x, y):
-		return self.Y*x > self.X*y
-		
-	def GreaterOrEqual(self, x, y):
-		return self.Y*x >= self.X*y
-		
-	def Less(self, x, y):
-		return self.Y*x < self.X*y
-		
-	def LessOrEqual(self, x, y):
-		return self.Y*x <= self.X*y
+		current = target
+		path = [current]
+		while current != origin:
+			current = came_from[current[0], current[1]]
+			path.append(current)
+		return path
 		
 #------------------------------------------
 		
@@ -628,11 +483,6 @@ class UnitManager(object):
 	def moveClearMoveQueue(self, unit):
 		del self.MOVEQUEUE[unit.arrayPos][1:len(self.MOVEQUEUE[unit.arrayPos])]
 	
-	#ducttape till I get the mouse support running
-	def moveSelect(self, toX, toY):
-		Map0.MAPSELECT.statCoord[0] += toX
-		Map0.MAPSELECT.statCoord[1] += toY
-	
 	#moves all units according to their movement queues in MOVEQUEUE
 	def unitMove(self):
 		self.moveResolveCollision()
@@ -660,19 +510,8 @@ class UnitManager(object):
 			self.MOVEQUEUE[UNIT.arrayPos][0] = [UNIT.statCoord[0], UNIT.statCoord[1]]
 			self.moveClearMoveQueue(UNIT)
 	
-	#def unitAttack(self, attackingUnit, targetedUnit):
-	#	if isinstance(attackingUnit, Tank) or isinstance(attackingUnit, Artillery):
-	#		targetedUnit.statHealth -= attackingUnit.statDamage
-	
 	def unitSelect(self):
-		self.SELECTEDUNIT = Map0.mapGetUnit(Map0.MAPSELECT.statCoord)
-		
-	def unitCalculateVisibility(self):
-		for UNIT in self.UNITARRAY:
-			result = Map0.mapCalculateVisibility(UNIT.statCoord, UNIT.statVR)
-			print(result)
-			del UNIT.visibilityArray[0:len(UNIT.visibilityArray)-1]
-			UNIT.visibilityArray = result
+		self.SELECTEDUNIT = Map0.getUnit(Map0.MAPSELECT.statCoord)
 
 #------------------------------------------
 		
@@ -680,68 +519,44 @@ class Unit(object):
 	statCoord = [0, 0]
 	statHealth = 10
 	statArmor = 0
-	statDamage = 10
 	statSpeed = 5
 	statVR = 6
 	arrayPos = 0
-	visibilityArray = []
 	
-	def drawUnit(self):
-		pass
-
 class Scout(Unit):
-	def drawUnit(self):
-		outerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+1, self.statCoord[1]*Window0.CELLSIZE+1, Window0.CELLSIZE -1, Window0.CELLSIZE -1)
-		innerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+5, self.statCoord[1]*Window0.CELLSIZE+5, Window0.CELLSIZE -9, Window0.CELLSIZE -9)
-		pygame.draw.rect(Window0.DISPLAYSURF, Window0.DARKRED, outerRect)
-		pygame.draw.rect(Window0.DISPLAYSURF, Window0.LIGHTGRAY, innerRect)
+	pass
 		
 class Tank(Unit):
+	statDamage = 10
 	statFR = 4
 	statAmmoCap = 10
 	targetedUnit = -1
-	
-	def drawUnit(self):
-		outerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+1, self.statCoord[1]*Window0.CELLSIZE+1, Window0.CELLSIZE -1, Window0.CELLSIZE -1)
-		innerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+5, self.statCoord[1]*Window0.CELLSIZE+5, Window0.CELLSIZE -9, Window0.CELLSIZE -9)
-		pygame.draw.rect(Window0.DISPLAYSURF, Window0.DARKRED, outerRect)
-		pygame.draw.rect(Window0.DISPLAYSURF, Window0.RED, innerRect)
 		
-	def unitAttack(self):
+	def unitTargetChange(self):
 		if self.statAmmoCap != 0:
-			targetedUnit = Map0.mapGetUnit(Map0.MAPSELECT.statCoord)
+			targetedUnit = Map0.getUnit(Map0.MAPSELECT.statCoord)
 			if targetedUnit != -1 and targetedUnit != Unit0.SELECTEDUNIT:
-				if Map0.mapGetDistance(self.statCoord, targetedUnit.statCoord) <= Unit0.SELECTEDUNIT.statFR:
+				if Map0.getDistance(self.statCoord, targetedUnit.statCoord) <= Unit0.SELECTEDUNIT.statFR:
 					self.targetedUnit = targetedUnit
 					Input0.setState(1)
 
 class Artillery(Unit):
+	statDamage = 10
 	statMinFR = 2
 	statMaxFR = 10
 	statAmmoCap = 10
-	targetedCoord = [-1, -1]
+	targetedCoord = [None]
 	
-	def drawUnit(self):
-		outerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+1, self.statCoord[1]*Window0.CELLSIZE+1, Window0.CELLSIZE -1, Window0.CELLSIZE -1)
-		innerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+5, self.statCoord[1]*Window0.CELLSIZE+5, Window0.CELLSIZE -9, Window0.CELLSIZE -9)
-		pygame.draw.rect(Window0.DISPLAYSURF, Window0.DARKRED, outerRect)
-		pygame.draw.rect(Window0.DISPLAYSURF, Window0.LIGHTBLUE, innerRect)
-	
-	def unitAttack(self):
+	def unitTargetChange(self):
 		if self.statAmmoCap != 0:
 			targetedCoord = [Map0.MAPSELECT.statCoord[0], Map0.MAPSELECT.statCoord[1]]
-			if Map0.mapGetDistance(self.statCoord, targetedCoord) > Unit0.SELECTEDUNIT.statMinFR and Map0.mapGetDistance(self.statCoord, targetedCoord) <= Unit0.SELECTEDUNIT.statMaxFR:
+			if Map0.getDistance(self.statCoord, targetedCoord) > Unit0.SELECTEDUNIT.statMinFR and Map0.getDistance(self.statCoord, targetedCoord) <= Unit0.SELECTEDUNIT.statMaxFR:
 				self.targetedCoord = [targetedCoord[0], targetedCoord[1]]
 				Input0.setState(1)
 		
 class Engineer(Unit):
+	statDamage = 5
 	statFR = 5
-	
-	def drawUnit(self):
-		outerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+1, self.statCoord[1]*Window0.CELLSIZE+1, Window0.CELLSIZE -1, Window0.CELLSIZE -1)
-		innerRect = pygame.Rect(self.statCoord[0]*Window0.CELLSIZE+5, self.statCoord[1]*Window0.CELLSIZE+5, Window0.CELLSIZE -9, Window0.CELLSIZE -9)
-		pygame.draw.rect(Window0.DISPLAYSURF, Window0.DARKRED, outerRect)
-		pygame.draw.rect(Window0.DISPLAYSURF, Window0.YELLOW, innerRect)
 
 #------------------------------------------
 		
@@ -764,7 +579,7 @@ class Main(object):
 	def test(self):
 		Event0.eventAdd("EventUnitCreate", ("Tank", [1, 3]))
 		Event0.eventAdd("EventUnitCreate", ("Artillery", [3, 1]))
-		Event0.eventAdd("EventUnitCreate", ("Tank", [5, 1]))
+		Event0.eventAdd("EventUnitCreate", ("Tank", [0, 0]))
 		Event0.eventHandle()
 
 StartShenanigans = Main()

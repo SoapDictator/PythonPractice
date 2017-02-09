@@ -69,19 +69,23 @@ input states:	#some game events are able to switch those around
 ###
 
 TODO:
+	- rewrite input manager in its entirety
+		- add mouse support
+		- fix the attack function to add the ability of undoing attack
+	- rewrite unit manager
+	- add function(s) to draw all units
 	- fix field of view calculation
 	- add the turn structure (Preturn, First Half, Second Half, Postturn)
 	- add the team structure (and, therefore, friendly/enemy actions' conditions)
-	# - fix the attack function to add the ability of undoing attack
-	# - add mouse support
 	- separate the files and invent an interface to handle throwing managers around the files
-	?- add auto-pathing for movement
 	#- look up how to do GUI
-	- implement some existing units and add their abilities
-	- figure out how to calculate the armor damage reduction properly 
-		(prob just going to make it decreased by plain numbers)
+	#- implement some existing units and add their abilities
+	#- figure out how to calculate the armor damage reduction properly
 
 DONE:
-	= fixed the screenDrawFireRange function
-	= broke the filed of view calcualtion (this time it was dimond walls)
-	= added the moveResolveColision function, which determines the final position of the unit's movement
+	= rewrote the entire drawing manager
+	= added functions to convert real coordinates into hexes and vice versa
+	= added a function to round the coordinates to the nearest hex
+	= rewrote (almost) the entire map manager
+	= added functions to simplify the work with the map (you can get lines, rings and areas of hexes)
+	= added complete pathfinding

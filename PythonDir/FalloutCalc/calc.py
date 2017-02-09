@@ -39,7 +39,7 @@ class Application(object):
 		self.entryID.place(x = 120, y = 10, width = 30)
 		tk.Label(root, text = 'Ammunition:').place(x = 20, y = 35, width = 70)
 		self.droplistAmmo.place(x = 95, y = 32, width = 60, height = 25)
-		tk.Label(root, text = 'ArmorClass:').place(x = 10, y = 60, width = 105)
+		tk.Label(root, text = 'Armor Class:').place(x = 10, y = 60, width = 105)
 		self.entryAC.place(x = 120, y = 60, width = 30)
 		tk.Label(root, text = 'Damage Resistance:').place(x = 10, y = 85, width = 105)
 		self.entryDR.place(x = 120, y = 85, width = 30)
@@ -53,26 +53,32 @@ class Application(object):
 	def appCalculate(self, event):
 		self.textRD.delete('1.0', tk.END)
 		
-		if self.entryNS.get() != '' and self.entryID.get() != '' and self.valueDice.get() != 'Dice' and self.entryAC.get() != '' and self.entryDR.get() != '':
+		stringCheck1 = self.entryNS.get() != ''
+		stringCheck2 = self.entryID.get() != ''
+		stringCheck3 = self.valueDice.get() != 'Dice'
+		stringCheck4 = self.entryAC.get() != ''
+		stringCheck5 = self.entryDR.get() != ''
+		
+		if stringCheck1 and stringCheck2 and stringCheck3 and stringCheck4 and stringCheck5:
 			for i in range(0, int(self.entryNS.get())):
-				valueHitChance = str(random.randint(0, 99))
+				hitChance = str(random.randint(1, 100))
 				
 				Ammo = self.valueDice.get()
 				if Ammo == self.optionAmmunition[0]:
-					valueAmmoFired = random.randint(0, 3)
+					AmmoUsed = random.randint(1, 4)
 				elif Ammo == self.optionAmmunition[1]:
-					valueAmmoFired = random.randint(0, 5)
+					AmmoUsed = random.randint(1, 6)
 				elif Ammo == self.optionAmmunition[2]:
-					valueAmmoFired = random.randint(0, 7)
+					AmmoUsed = random.randint(1, 8)
 				elif Ammo == self.optionAmmunition[3]:
-					valueAmmoFired = random.randint(0, 9)
+					AmmoUsed = random.randint(1, 10)
 				
-				valueInitialDamage = int(self.entryID.get()) + valueAmmoFired
-				valueArmorClass = int(self.entryAC.get())
-				valueDamageRes = float(self.entryDR.get()) / 100
-				self.valueResultiveDamage = int((valueInitialDamage - valueArmorClass) - (valueInitialDamage - valueArmorClass)*valueDamageRes)
+				dmgInitial= int(self.entryID.get()) + AmmoUsed
+				AC = int(self.entryAC.get())
+				dmgResist = float(self.entryDR.get()) / 100
+				self.valueResultiveDamage = int((dmgInitial- AC) - (dmgInitial- AC)*dmgResist)
 				
-				returnString = valueHitChance+': '+str(self.valueResultiveDamage)+'\n'
+				returnString = hitChance+': '+str(self.valueResultiveDamage)+'dmg\n'
 				self.textRD.insert(tk.END, returnString)
 		
 root = tk.Tk()
