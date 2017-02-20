@@ -63,10 +63,10 @@ class GameEventManager(object):
 		
 		for UNIT in Unit0.UNITARRAY:
 			if isinstance(UNIT, Tank):
-				if UNIT.targetedUnit != -1:
+				if UNIT.targetedUnit != None:
 					Event0.eventAdd("EventUnitAttack", UNIT)
 			elif isinstance(UNIT, Artillery):
-				if UNIT.targetedCoord != [-1, -1]:
+				if UNIT.targetedCoord != [None]:
 					Event0.eventAdd("EventUnitAttack", UNIT)
 
 		for event in self.EVENTQUEUE:
@@ -117,24 +117,21 @@ class EventUnitAttack(GameEvent):
 	
 	def execute(self):
 		if isinstance(self.attackingUnit, Tank):
-			if self.attackingUnit.targetedUnit != -1:
+			if self.attackingUnit.targetedUnit != None:
 				self.attackingUnit.targetedUnit.statHealth -= self.attackingUnit.statDamage
-				self.attackingUnit.targetedUnit = -1
+				self.attackingUnit.targetedUnit = None
 		elif isinstance(self.attackingUnit, Artillery):
 			targetedUnit = Map0.getUnit(self.attackingUnit.targetedCoord)
 			if targetedUnit != -1:
 				targetedUnit.statHealth -= self.attackingUnit.statDamage
-			self.attackingUnit.targetedCoord = [-1, -1]
+			self.attackingUnit.targetedCoord = [None]
 		print("A unit is (probably) under attack!")
 
 #------------------------------------------
 
 #Needs an overhaul since i use hexes now
 class InputManager(object):
-	inputState = ['moveSelection', 'unitSelected', 'unitTargetChange']
-	inputDict = {inputState[0]:	['moveSelect'], 
-				 inputState[1]:	['moveStore'], 
-				 inputState[2]:	['moveSelect']}
+	inputState = ['moveSelection', 'unitSelected', 'unitTarget']
 	currentState = inputState[0]
 	
 	def getState(self):
@@ -149,28 +146,45 @@ class InputManager(object):
 		for event in pygame.event.get():	#this is chinese level of programming, needs fixing as well
 			if event.type == QUIT:
 				self.terminate()
-			if event.type == KEYDOWN:
-				if event.key == K_UP:		getattr(Unit0, self.inputDict[self.getState()][0])(0, -1)
-				elif event.key == K_DOWN:	getattr(Unit0, self.inputDict[self.getState()][0])(0, +1)
-				elif event.key == K_RIGHT:	getattr(Unit0, self.inputDict[self.getState()][0])(+1, 0)
-				elif event.key == K_LEFT:	getattr(Unit0, self.inputDict[self.getState()][0])(-1, 0)
 			if self.getState() == 'moveSelection':
+				if pygame.mouse.get_pressed() == (1, 0, 0):
+					coord = Window0.pixeltohex(pygame.mouse.get_pos())
+					Unit0.SELECTEDUNIT = Map0.getUnit(coord)
+					if Unit0.SELECTEDUNIT != None:	self.setState(1)
+					elif coord not in Map0.MOARRAY:
+						Map0.MOARRAY.append(coord)
+					else:
+						for i in range(0, len(Map0.MOARRAY)+1):
+							if Map0.MOARRAY[i] == coord:
+								del Map0.MOARRAY[i]
+								break
 				if event.type == KEYDOWN:
 					if event.key == K_ESCAPE:	self.terminate()
-					elif event.key == K_e:
-						Unit0.unitSelect()
-						if Unit0.SELECTEDUNIT != -1:	self.setState(1)
-						else:							Event0.eventHandle()
+					elif event.key == K_e:	Event0.eventHandle()
 					elif event.key == K_z:		Event0.eventUndo()
 			elif self.getState() == 'unitSelected':
+				if pygame.mouse.get_pressed() == (0, 0, 1):
+					path = Map0.getPath(Unit0.SELECTEDUNIT.statSpeed, Unit0.SELECTEDUNIT.statCoord, Window0.pixeltohex(pygame.mouse.get_pos()))
+					Unit0.MOVEQUEUE[Unit0.SELECTEDUNIT.arrayPos] = path[::-1]
+					self.setState(0)
 				if event.type == KEYDOWN:
 					if event.key == K_ESCAPE:	self.setState(0)
 					elif event.key == K_a:		self.setState(2)
-					elif event.key == K_z:		Event0.eventUndo()
-			elif self.getState() == 'unitTargetChange':
+					elif event.key == K_z:			Event0.eventUndo()
+			elif self.getState() == 'unitTarget':
+				if pygame.mouse.get_pressed() == (1, 0, 0):
+					area = Map0.getRing(Unit0.SELECTEDUNIT.statFR, Unit0.SELECTEDUNIT.statCoord, width = 0)
+					coord = Window0.pixeltohex(pygame.mouse.get_pos())
+					if area.has_key((coord[0], coord[1])):
+						isok = Unit0.SELECTEDUNIT.targetChange(coord)
+						if isok:
+							self.setState(1)
+						break
 				if event.type == KEYDOWN:
 					if event.key == K_ESCAPE:	self.setState(1)
-					elif event.key == K_e:		Unit0.SELECTEDUNIT.unitTargetChange()
+					elif event.key == K_e:		
+						Unit0.SELECTEDUNIT.targetChange()
+						self.setState(1)
 
 	def terminate(self):
 		print("Terminated.")
@@ -194,8 +208,47 @@ class DrawingManager(object):
 		pygame.init()
 		self.FPSCLOCK = pygame.time.Clock()
 		self.DISPLAYSURF = pygame.display.set_mode((self.WINDOWWIDTH, self.WINDOWHEIGHT))
-		self.BASICFONT = pygame.font.Font('freesansbold.ttf', 18)
+		self.BASICFONT = pygame.font.Font('freesansbold.ttf', 12)
 		pygame.display.set_caption('AD')
+
+	#takes settings frrom config.txt
+	def screenConfig(self):
+		config = open("config.txt", "r")
+		for line in config:
+			if "FPS = " in line:
+				self.FPS = float(line[6:9])
+			elif "WINDOWWIDTH = " in line:
+				self.WINDOWWIDTH = int(line[14:18])
+			elif "WINDOWHEIGHT = " in line:
+				self.WINDOWHEIGHT = int(line[15:19])
+			elif "CELLSIZE = " in line:
+				self.CELLSIZE = int(line[11:15])
+		
+		#assert self.WINDOWWIDTH % self.CELLSIZE == 0
+		#assert self.WINDOWHEIGHT % self.CELLSIZE == 0
+
+		self.CELLWIDTH = int(self.WINDOWWIDTH / self.CELLSIZE)
+		self.CELLHEIGHT = int(self.WINDOWHEIGHT / self.CELLSIZE)
+		
+		self.MAPRADIUS = 7
+		self.POINTCENTER = [(0.5+self.MAPRADIUS)*math.sqrt(3)/2*self.CELLSIZE, 
+										(0.5+self.MAPRADIUS*0.75)*self.CELLSIZE]
+	
+	def screenColors(self):
+		#								R		G		B
+		self.WHITE				= (255, 255, 255)
+		self.BLACK				= (    0,     0,     0)
+		self.LIGHTBLUE		= (180, 180, 255)
+		self.BLUE					= (120, 120, 255)
+		self.LIGHTRED			= (205,   92,   92)
+		self.RED					= (220,     0,     0)
+		self.DARKRED			= (120,     0,     0)
+		self.GREEN				= (  34, 180,    34)
+		self.YELLOW			= (220, 220,     0)
+		self.GREENYELLOW	= (173, 220,   47)
+		self.LIGHTGRAY		= (150, 150, 150)
+		self.DARKGREY			= (60, 60, 60)
+		self.BGCOLOR	= self.DARKGREY
 		
 	def hextopixel(self, hex):
 		x = self.POINTCENTER[0] + self.CELLSIZE/2 * math.sqrt(3) * (hex[0] +hex[1]*0.5)
@@ -206,10 +259,11 @@ class DrawingManager(object):
 		y = (pixelHex[1] - self.POINTCENTER[1]) / (self.CELLSIZE/2 * 1.5)
 		x = (pixelHex[0] - self.POINTCENTER[0]) / (self.CELLSIZE/2 * math.sqrt(3)) - y*0.5
 		return self.hexRound([x, y])
-		
+	
+	#takes float hex coordinates and rounds it to the nearest hex
 	def hexRound(self, hex):
 		rx = round(hex[0])
-		ry = round(-hex[0]-hex[1])
+		ry = round(-hex[0]-hex[1])	#since axial coordinates are used Y has to be calculated
 		rz = round(hex[1])
 		
 		dx = abs(rx - hex[0])
@@ -224,12 +278,12 @@ class DrawingManager(object):
 		else:
 			rz = -rx-ry
 			
-		return [rx, rz]
+		return [int(rx), int(rz)]
 	
 	#draws a single hex; width=1 will draw an outline, width=0 draws a solid figure
 	def drawHex(self, hex, color = [255, 255, 255], width = 1):
-		h = self.CELLSIZE
-		w = math.sqrt(3)/2 * h
+		h = float(self.CELLSIZE)
+		w = 1.732*0.5 * h
 		directions_pixel = [[0, 0.5*h], [0.5*w, 0.25*h], [0.5*w, -0.25*h], 
 									[0, -0.5*h], [-0.5*w, -0.25*h], [-0.5*w, 0.25*h]]
 		pixelhex = self.hextopixel(hex)
@@ -239,6 +293,12 @@ class DrawingManager(object):
 			points.append([pixelhex[0]+directions_pixel[i][0], 
 									pixelhex[1]+directions_pixel[i][1]])
 		pygame.draw.polygon(self.DISPLAYSURF, color, points, width)
+		
+		#displays the coordinates on the hex itself
+		textsurf = self.BASICFONT.render('%s, %s' % (hex[0], hex[1]), True, self.WHITE)
+		textrect = textsurf.get_rect()
+		textrect.center = (pixelhex)
+		self.DISPLAYSURF.blit(textsurf, textrect)
 	
 	#draws a direct line from origin to target
 	def drawLine(self, origin, target, color = [255, 255, 255]):
@@ -267,81 +327,76 @@ class DrawingManager(object):
 	#draws EVERYTHING again on each frame
 	def screenRefresh(self):
 		self.DISPLAYSURF.fill(self.BGCOLOR)
-		self.drawGrid([150, 150, 150], 0)
+		self.drawGrid(self.LIGHTGRAY, 0)
 		
-		#for hex in Map0.getLine(self.pixeltohex(pygame.mouse.get_pos()), [3, 0]):
-		#for hex in Map0.getRing(Map0.getDistance(self.pixeltohex(pygame.mouse.get_pos()), [0, 0]), width = 0):
-		for hex in Map0.getPath(self.MAPRADIUS, [0, 0], self.pixeltohex(pygame.mouse.get_pos())):
-			self.drawHex(hex, [120, 120, 255], 0)
+		#for hex in Map0.getLine(self.pixeltohex(pygame.mouse.get_pos()), [0, 0]):
+		#for hex in Map0.getRing(Map0.getDistance(self.pixeltohex(pygame.mouse.get_pos()), [0, 0]), coord = [0, 0],width = 0):
+		#for hex in Map0.getPath(5, [0, 0], self.pixeltohex(pygame.mouse.get_pos())):
+			#self.drawHex(hex, [120, 120, 255], 0)
+		
+		if Input0.getState() == 'unitSelected':
+			for hex in Map0.getRing(Unit0.SELECTEDUNIT.statSpeed, Unit0.SELECTEDUNIT.statCoord, width = 0, MO = True):
+				self.drawHex(hex, self.LIGHTBLUE, 0)
+			for hex in Map0.getPath(Unit0.SELECTEDUNIT.statSpeed, Unit0.SELECTEDUNIT.statCoord, Window0.pixeltohex(pygame.mouse.get_pos())):
+				self.drawHex(hex, self.BLUE, 0)
+					
+		if Input0.getState() == 'unitTarget':
+			for hex in Map0.getRing(Unit0.SELECTEDUNIT.statFR, Unit0.SELECTEDUNIT.statCoord, width = 0):
+				self.drawHex(hex, self.LIGHTRED, 0)
+		
+		for hex in Map0.MOARRAY:
+			self.drawHex(hex, self.DARKGREY, 0)
+		
+		for unit in Unit0.UNITARRAY:
+			self.drawHex(unit.statCoord, self.GREENYELLOW, 0)
+			
+		if Input0.getState() == 'unitTarget':
+			for hex in Map0.getRing(Unit0.SELECTEDUNIT.statFR, Unit0.SELECTEDUNIT.statCoord, width = 0):
+				if Map0.getUnit(hex) != None and [hex[0], hex[1]] != Unit0.SELECTEDUNIT.statCoord:
+					self.drawHex(hex, self.RED, 0)
+		
 		self.drawGrid()
-		#self.drawLine(self.pixeltohex(pygame.mouse.get_pos()), [3, 0])
 		
 		pygame.display.update()
-	
-	#takes settings frrom config.txt
-	def screenConfig(self):
-		config = open("config.txt", "r")
-		for line in config:
-			if "FPS = " in line:
-				self.FPS = float(line[6:9])
-			elif "WINDOWWIDTH = " in line:
-				self.WINDOWWIDTH = int(line[14:18])
-			elif "WINDOWHEIGHT = " in line:
-				self.WINDOWHEIGHT = int(line[15:19])
-			elif "CELLSIZE = " in line:
-				self.CELLSIZE = int(line[11:15])
-		
-		#assert self.WINDOWWIDTH % self.CELLSIZE == 0
-		#assert self.WINDOWHEIGHT % self.CELLSIZE == 0
-
-		self.CELLWIDTH = int(self.WINDOWWIDTH / self.CELLSIZE)
-		self.CELLHEIGHT = int(self.WINDOWHEIGHT / self.CELLSIZE)
-		
-		self.MAPRADIUS = 4
-		self.POINTCENTER = [(0.5+self.MAPRADIUS)*math.sqrt(3)/2*self.CELLSIZE, 
-										(0.5+self.MAPRADIUS*0.75)*self.CELLSIZE]
-	
-	def screenColors(self):
-		#								R		G		B
-		self.WHITE				= (255, 255, 255)
-		self.BLACK				= (    0,     0,     0)
-		self.BLUE					= (    0,     0, 155)
-		self.RED					= (255,     0,     0)
-		self.DARKRED			= (120,     0,     0)
-		self.GREEN				= (    0, 255,     0)
-		self.YELLOW			= (255, 255,     0)
-		self.GREENYELLOW	= (173, 255,   47)
-		self.LIGHTBLUE		= (  0,   150, 255)
-		self.LIGHTGRAY		= (120, 120, 120)
-		self.BGCOLOR	= [60, 60, 60]
 
 #------------------------------------------
 		
 class MapManager(object):
+	MAP = []
 	NEIGHBOURS = {}
 	MOARRAY = []
 	VOARRAY = []
 	
 	def __init__(self):
-		self.MAPSELECT = Unit()
 		#this is currently the only way to add Movement Obsticles
-		#self.MOARRAY.append([3, 0])
-		#self.MOARRAY.append([3, 2])
-		#self.MOARRAY.append([3, 4])
-		#self.MOARRAY.append([3, 6])
-		self.createNeighbours()
+		self.MOARRAY.append([1, 0])
+		#self.MOARRAY.append([1, -1])
+		self.MOARRAY.append([-1, 0])
+		self.MOARRAY.append([-1, 1])
+		self.MOARRAY.append([0, 1])
+		self.MOARRAY.append([0, -2])
+		self.MOARRAY.append([-2, 2])
+		self.MOARRAY.append([2, 0])
+		self.MOARRAY.append([3, 0])
+		self.MOARRAY.append([4, 0])
+		self.MOARRAY.append([-1, -1])
+		self.MOARRAY.append([1, -2])
+		self.createMap()
 	
 	#generates a graph of all possible transitions from one tile to another
-	def createNeighbours(self):
+	def createMap(self):
 		self.DIRECTIONS = [[-1, 0], [-1, +1], [0, +1],
 										[+1, 0], [+1, -1], [0, -1]]
 	
 		for Q in range(-Window0.MAPRADIUS, Window0.MAPRADIUS+1):
 			for R in range(-Window0.MAPRADIUS, Window0.MAPRADIUS+1):
+				if self.getDistance([Q, R], [0, 0]) > Window0.MAPRADIUS:
+					continue
+				self.MAP.append([Q, R])
 				self.NEIGHBOURS[Q, R] = []
 				for hex in self.DIRECTIONS:
 					newHex = [Q+hex[0], R+hex[1]]
-					if self.getDistance(newHex, [0, 0]) <= Window0.MAPRADIUS and newHex not in self.MOARRAY:
+					if self.getDistance(newHex, [0, 0]) <= Window0.MAPRADIUS:
 						self.NEIGHBOURS[Q, R].append([newHex[0], newHex[1]])
 	
 	#curently calculates distance in axial hexagonal coordinates
@@ -366,49 +421,76 @@ class MapManager(object):
 		else:		div = 0
 		result = []
 		
+		#if your target is outside the map the line will go to the closest to your target hex
 		for i in range(0, N+1):
 			Q =  float(origin[0]) + float(target[0] - origin[0]) * div * i
 			R = float(origin[1]) + float(target[1] - origin[1]) * div * i
-			result.append(Window0.hexRound([Q, R]))
+			
+			hex = Window0.hexRound([Q, R])
+			if hex not in self.MAP:
+				continue
+			result.append(hex)
 		return result
 	
 	#returns a hexes in a ring of a given radius; width=0 returns the entire circle
-	def getRing(self, limit, coord = [0, 0], width = 1):
+	def getRing(self, limit, coord = [0, 0], width = 1, MO = False):
 		frontier = [[coord[0], coord[1]]]
+		current = frontier[0]
 		visited = {}
-		visited[coord[0], coord[1]] = None
-		flagBreak = False
+		visited[coord[0], coord[1]] = 0
 		
-		while not flagBreak:
-			current = frontier[0]
+		while True:
+			for next in self.NEIGHBOURS[current[0], current[1]]:
+				if not visited.has_key((next[0], next[1])) and not (next in self.MOARRAY and MO):
+					frontier.append(next)
+					visited[next[0], next[1]] = visited[current[0], current[1]] + 1
 			del frontier[0]
-			if self.getDistance(coord, current) < limit:
-				for next in self.NEIGHBOURS[current[0], current[1]]:
-					if not visited.has_key((next[0], next[1])):
-						frontier.append(next)
-						visited[next[0], next[1]] = [current[0], current[1]]
-			else:
-				frontier.append([current[0], current[1]])
-				flagBreak = True
+			current = frontier[0]
+			if visited[current[0], current[1]] == limit or len(frontier) == 0:
+				break
+			
 		if width == 1:
 			return frontier
 		elif width == 0:
 			return visited
 	
-	#returns a unit in a given coordiante if it's there, otherwise returns -1 int
+	#returns a unit in a given coordiante if it's there, otherwise returns None
 	def getUnit(self, coord):
 		for UNIT in Unit0.UNITARRAY:
-			if UNIT.statCoord == coord:
+			if [UNIT.statCoord[0], UNIT.statCoord[1]] == [coord[0], coord[1]]:
 				return UNIT
-		return -1
+		return None
 	
 	def getPath(self, limit, origin, target):
-		came_from = self.getRing(limit, origin, 0)
+		frontier = [[origin[0], origin[1]]]
+		current = frontier[0]
+		came_from = {}
+		came_from[origin[0], origin[1]] = [[None], 0]
+		
+		while True:
+			for next in self.NEIGHBOURS[current[0], current[1]]:
+				if not came_from.has_key((next[0], next[1])) and next not in self.MOARRAY:
+					frontier.append(next)
+					depth = came_from[current[0], current[1]][1] + 1
+					came_from[next[0], next[1]] = [[current[0], current[1]], depth]
+			del frontier[0]
+			current = frontier[0]
+			depth = came_from[current[0], current[1]][1]
+			if depth >= limit or len(frontier) == 0 or current == target:
+				break
+
+		#if your target is outside the limit pathfinder will rather make a path to the closest to your target hex
+		if not came_from.has_key((target[0], target[1])):
+			line = self.getLine(origin, target)
+			for hex in line[::-1]:
+				if came_from.has_key((hex[0], hex[1])):
+					target = hex
+					break
 		
 		current = target
 		path = [current]
 		while current != origin:
-			current = came_from[current[0], current[1]]
+			current = came_from[current[0], current[1]][0]
 			path.append(current)
 		return path
 		
@@ -417,7 +499,7 @@ class MapManager(object):
 class UnitManager(object):
 	UNITARRAY = []	#array of ALL units on the map
 	MOVEQUEUE = []	#array of ALL movement queues of ALL units, position of the movement queue is determined by a unit's position in UNITARRAY
-	SELECTEDUNIT = -1	#currently selected unit, default value is "-1"; needs to be reseted after the unit is deselected
+	SELECTEDUNIT = None	#currently selected unit, default value is "-1"; needs to be reseted after the unit is deselected
 	
 	#creates a new unit and adds it to the UNITARRAY as well as creates an entry in MOVEQUEUE; new unit will always be the last one in the array
 	def unitCreate(self, unitType, toX, toY):
@@ -441,47 +523,35 @@ class UnitManager(object):
 		for UNIT in self.UNITARRAY: 	#shifts all tanks situated after the deleted one in the array, since the MOVEQUEUE position is tracked by arrayPos
 			if deletedUnit.arrayPos < UNIT.arrayPos:
 				UNIT.arrayPos -= 1
-		
-	#saves a move and checks for the previous move undo
-	def moveStore(self, toX, toY):
-		Position = self.SELECTEDUNIT.arrayPos
-		moveLength = len(self.MOVEQUEUE[Position])-1
-		X = self.MOVEQUEUE[Position][moveLength][0]
-		Y = self.MOVEQUEUE[Position][moveLength][1]
-		if [X+toX, Y+toY] == [self.MOVEQUEUE[Position][moveLength-1][0], self.MOVEQUEUE[Position][moveLength-1][1]]:
-			del self.MOVEQUEUE[Position][moveLength]
-		elif [X+toX, Y+toY] in self.MOVEQUEUE[Position]:	#unit cannot move through the same position twice
-			pass
-		elif moveLength >= self.SELECTEDUNIT.statSpeed:
-			pass
-		elif [X+toX, Y+toY] not in Map0.MOARRAY[X, Y]:
-			self.MOVEQUEUE[Position].append([X+toX, Y+toY])
 	
 	#resolves situations when 2 or more units are trying to take the same final position
 	def moveResolveCollision(self):
 		for UNIT in self.UNITARRAY:
-			if len(self.MOVEQUEUE[UNIT.arrayPos]) > 1: #checking all units which are moving this turn
+			#checking all units which are moving this turn
+			if len(self.MOVEQUEUE[UNIT.arrayPos]) > 1: 
 				for unit in self.UNITARRAY:
 					if UNIT != unit:
 						finalUNITpos = self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
 						finalunitpos = self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
-						if finalUNITpos == finalunitpos and len(self.MOVEQUEUE[unit.arrayPos]) < 2:	#moving unit can't take the position of the immobile unit
+						#moving unit can't take the position of the immobile unit
+						if finalUNITpos == finalunitpos and len(self.MOVEQUEUE[unit.arrayPos]) < 2:
 							del self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
-						elif finalUNITpos == finalunitpos and len(self.MOVEQUEUE[UNIT.arrayPos]) > len(self.MOVEQUEUE[unit.arrayPos]):	#if one unit moved less than the other it will take the position
+						#if one unit moved less than the other it will take the position
+						elif finalUNITpos == finalunitpos and len(self.MOVEQUEUE[UNIT.arrayPos]) > len(self.MOVEQUEUE[unit.arrayPos]):
 							del self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
-						elif finalUNITpos == finalunitpos and len(self.MOVEQUEUE[UNIT.arrayPos]) < len(self.MOVEQUEUE[unit.arrayPos]):	#if one unit moved less than the other it will take the position
+						#if one unit moved less than the other it will take the position
+						elif finalUNITpos == finalunitpos and len(self.MOVEQUEUE[UNIT.arrayPos]) < len(self.MOVEQUEUE[unit.arrayPos]):
 							del self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
-						elif finalUNITpos == finalunitpos and len(self.MOVEQUEUE[UNIT.arrayPos]) == len(self.MOVEQUEUE[unit.arrayPos]):	#if both units moved the same distance
+						#if both units moved the same distance						
+						elif finalUNITpos == finalunitpos and len(self.MOVEQUEUE[UNIT.arrayPos]) == len(self.MOVEQUEUE[unit.arrayPos]):
 							if UNIT.statSpeed > unit.statSpeed:
 								del self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
 							elif UNIT.statSpeed < unit.statSpeed:
 								del self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
-							else:	#if both units traveled same distance and have the same speed noone will take the final position
+							#if both units traveled same distance and have the same speed noone will take the final position
+							else:
 								del self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
-								del self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
-								
-	def moveClearMoveQueue(self, unit):
-		del self.MOVEQUEUE[unit.arrayPos][1:len(self.MOVEQUEUE[unit.arrayPos])]
+								#del self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
 	
 	#moves all units according to their movement queues in MOVEQUEUE
 	def unitMove(self):
@@ -508,10 +578,7 @@ class UnitManager(object):
 		
 		for UNIT in self.UNITARRAY:
 			self.MOVEQUEUE[UNIT.arrayPos][0] = [UNIT.statCoord[0], UNIT.statCoord[1]]
-			self.moveClearMoveQueue(UNIT)
-	
-	def unitSelect(self):
-		self.SELECTEDUNIT = Map0.getUnit(Map0.MAPSELECT.statCoord)
+			del self.MOVEQUEUE[UNIT.arrayPos][1:len(self.MOVEQUEUE[UNIT.arrayPos])]
 
 #------------------------------------------
 		
@@ -528,31 +595,33 @@ class Scout(Unit):
 		
 class Tank(Unit):
 	statDamage = 10
-	statFR = 4
+	statFR = 3
 	statAmmoCap = 10
-	targetedUnit = -1
+	targetedUnit = None
 		
-	def unitTargetChange(self):
+	def targetChange(self, coord):
 		if self.statAmmoCap != 0:
-			targetedUnit = Map0.getUnit(Map0.MAPSELECT.statCoord)
-			if targetedUnit != -1 and targetedUnit != Unit0.SELECTEDUNIT:
+			targetedUnit = Map0.getUnit(coord)
+			if targetedUnit != None and targetedUnit != Unit0.SELECTEDUNIT:
 				if Map0.getDistance(self.statCoord, targetedUnit.statCoord) <= Unit0.SELECTEDUNIT.statFR:
 					self.targetedUnit = targetedUnit
-					Input0.setState(1)
+					return True
+		return False
 
 class Artillery(Unit):
 	statDamage = 10
 	statMinFR = 2
-	statMaxFR = 10
+	statMaxFR = 5
 	statAmmoCap = 10
 	targetedCoord = [None]
 	
-	def unitTargetChange(self):
+	def targetChange(self, coord):
 		if self.statAmmoCap != 0:
-			targetedCoord = [Map0.MAPSELECT.statCoord[0], Map0.MAPSELECT.statCoord[1]]
+			targetedCoord = [coord[0], coord[1]]
 			if Map0.getDistance(self.statCoord, targetedCoord) > Unit0.SELECTEDUNIT.statMinFR and Map0.getDistance(self.statCoord, targetedCoord) <= Unit0.SELECTEDUNIT.statMaxFR:
-				self.targetedCoord = [targetedCoord[0], targetedCoord[1]]
-				Input0.setState(1)
+				self.targetedCoord = targetedCoord
+				return True
+		return False
 		
 class Engineer(Unit):
 	statDamage = 5
@@ -577,9 +646,8 @@ class Main(object):
 			Window0.FPSCLOCK.tick(Window0.FPS)
 	
 	def test(self):
-		Event0.eventAdd("EventUnitCreate", ("Tank", [1, 3]))
-		Event0.eventAdd("EventUnitCreate", ("Artillery", [3, 1]))
 		Event0.eventAdd("EventUnitCreate", ("Tank", [0, 0]))
+		Event0.eventAdd("EventUnitCreate", ("Tank", [3, 1]))
 		Event0.eventHandle()
 
 StartShenanigans = Main()

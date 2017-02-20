@@ -47,7 +47,7 @@ unit class
 -> unit management
 	-stats (health, armor, speed, damage, AC, FR, VR)
 	-active buff/debuff #just a list that autoresolves in the end of the turn
-	-movement queue #i will probably move it to the unit management and create one huge queue fore everyone
+	-movement queue #i will probably move it to the unit management and create one huge queue for everyone
 
 ###
 
@@ -69,23 +69,20 @@ input states:	#some game events are able to switch those around
 ###
 
 TODO:
-	- rewrite input manager in its entirety
-		- add mouse support
-		- fix the attack function to add the ability of undoing attack
-	- rewrite unit manager
+	- add a function that will determine the color of the hex so it won't draw hexes on top of each other 50 times over
+	- fix the attack function to add the ability of undoing attack
+	- fix colision resoler to properly resolve scenarios when 2 units with the same speed move in the same line
 	- add function(s) to draw all units
 	- fix field of view calculation
 	- add the turn structure (Preturn, First Half, Second Half, Postturn)
 	- add the team structure (and, therefore, friendly/enemy actions' conditions)
-	- separate the files and invent an interface to handle throwing managers around the files
+	- separate the files and invent an interface to handle throwing managers around the files 
+		(just add a function to each file/class that will take all the managers created)
 	#- look up how to do GUI
 	#- implement some existing units and add their abilities
 	#- figure out how to calculate the armor damage reduction properly
 
 DONE:
-	= rewrote the entire drawing manager
-	= added functions to convert real coordinates into hexes and vice versa
-	= added a function to round the coordinates to the nearest hex
-	= rewrote (almost) the entire map manager
-	= added functions to simplify the work with the map (you can get lines, rings and areas of hexes)
-	= added complete pathfinding
+	= fixed map functions not properly working with coordinates outside of the map
+	= partially rewrote input manager to add mouse support
+	= fixed the pathfinder to properly calculate the path according to the limit
