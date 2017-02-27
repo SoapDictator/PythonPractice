@@ -71,18 +71,14 @@ input states:	#some game events are able to switch those around
 TODO:
 	- add a function that will determine the color of the hex so it won't draw hexes on top of each other 50 times over
 	- fix the attack function to add the ability of undoing attack
-	- fix colision resoler to properly resolve scenarios when 2 units with the same speed move in the same line
+	- fix colision resolver to properly resolve scenarios when 2 units with the same speed move in the same line
 	- add function(s) to draw all units
 	- fix field of view calculation
 	- add the turn structure (Preturn, First Half, Second Half, Postturn)
 	- add the team structure (and, therefore, friendly/enemy actions' conditions)
-	- separate the files and invent an interface to handle throwing managers around the files 
-		(just add a function to each file/class that will take all the managers created)
 	#- look up how to do GUI
 	#- implement some existing units and add their abilities
 	#- figure out how to calculate the armor damage reduction properly
 
 DONE:
-	= fixed map functions not properly working with coordinates outside of the map
-	= partially rewrote input manager to add mouse support
-	= fixed the pathfinder to properly calculate the path according to the limit
+	=	separated the main file to several, each containing its own manager
