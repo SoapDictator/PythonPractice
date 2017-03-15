@@ -4,33 +4,45 @@ class GameEventManager(object):
 	EVENTQUEUE = []
 	LASTADDEDEVENT = 0
 	
-	def defineGlobals(self, MapManager, UnitManager):
-		global Map0, Unit0
+	def defineGlobals(self, EventManager, MapManager, UnitManager):
+		global Event0, Map0, Unit0
+		Event0 = EventManager
 		Map0 = MapManager
 		Unit0 = UnitManager
 	
-	def eventAdd(self, eventName, data):	#TODO: event sorting mechanism
-		event = 0
-		if eventName == "EventUnitCreate":
+	def eventAdd(self, eventName, data = None):	#TODO: event sorting mechanism
+		event = None
+		if eventName == "EventUnitAttack":
+			event = EventUnitAttack(data)
+			if data in Unit0.TANKS:
+				priority = 21
+			elif data in Unit0.ARTILLERY or data in Unit0.ENGINEERS:
+				priority = 31
+			else:
+				priority = 0
+		elif eventName == "EventUnitHPCheck":
+			event = EventUnitHPCheck()
+			priority = 12
+		elif eventName == "EventUnitCreate":
 			event = EventUnitCreate(data)
-			priority = 3
+			priority = 13
 		elif eventName == "EventUnitDestroy":
 			event = EventUnitDestroy(data)
-			priority = 4
-		elif eventName == "EventUnitHealthCheck":
-			event = EventUnitHealthCheck()
-			priority = 2
+			priority = 34
 		elif eventName == "EventUnitAbilityCheck":
 			pass
-			#priority = 5
+			#priority = 15
 		elif eventName == "EventUnitMove":
-			event = EventUnitMove()
-			priority = 6
-		elif eventName == "EventUnitAttack":
-			event = EventUnitAttack(data)
-			priority = 1
+			if len(data) != 0:
+				event = EventUnitMove(data)
+				if data == Unit0.SCOUTS:
+					priority = 16
+				elif data == Unit0.TANKS:
+					priority = 26
+				elif data == Unit0.ARTILLERY or data == Unit0.ENGINEERS:
+					priority = 36
 		
-		if event != 0:
+		if event != None:
 			if len(self.EVENTQUEUE) > 1:
 				if self.EVENTQUEUE[0][1] > priority:
 					self.EVENTQUEUE.insert(0, [event, priority])
@@ -55,22 +67,30 @@ class GameEventManager(object):
 					self.LASTADDEDEVENT = 0
 	
 	def eventHandle(self):
-		self.eventAdd("EventUnitHealthCheck", 0)
-		self.eventAdd("EventUnitMove", 0)
+		del Unit0.PLAYERFOV[0:len(Unit0.PLAYERFOV)-1] #ducktape to recalculate player FOV
+		Unit0.PLAYERFOV = [[], []]
+		
+		self.eventAdd("EventUnitHPCheck")
+		
+		self.eventAdd("EventUnitMove", Unit0.SCOUTS)
+		self.eventAdd("EventUnitMove", Unit0.TANKS)
+		self.eventAdd("EventUnitMove", Unit0.ARTILLERY)
+		self.eventAdd("EventUnitMove", Unit0.ENGINEERS)
 		
 		for UNIT in Unit0.UNITARRAY:
-			if isinstance(UNIT, Tank):
+			if UNIT in Unit0.TANKS or UNIT in Unit0.ENGINEERS:
 				if UNIT.targetedUnit != None:
 					Event0.eventAdd("EventUnitAttack", UNIT)
-			elif isinstance(UNIT, Artillery):
+			elif UNIT in Unit0.ARTILLERY:
 				if UNIT.targetedCoord != [None]:
 					Event0.eventAdd("EventUnitAttack", UNIT)
-
+		
+		
 		for event in self.EVENTQUEUE:
 			event[0].execute()
 		del self.EVENTQUEUE[0:len(self.EVENTQUEUE)]
 		
-		#Unit0.unitCalculateVisibility()		commented out; needs fixing
+		Unit0.unitFOV()
 		print("------------")
 
 #------------------------------------------
@@ -81,31 +101,34 @@ class GameEvent(object):
 
 class EventUnitCreate(GameEvent):
 	def __init__(self, data):
-		self.unitType = data[0]
-		self.coord = data[1]
-		
+		self.data = data
 	def execute(self):
-		Unit0.unitCreate(self.unitType, self.coord[0], self.coord[1])
-		print("A new %s appeared!" %self.unitType)
+		Unit0.unitCreate(self.data[0], self.data[1], self.data[2])
+		print("A new %s appeared!" %self.data[0])
 
 class EventUnitDestroy(GameEvent):
-	def __init__(self, deletedUnit):
-		self.deletedUnit = deletedUnit
+	def __init__(self, data):
+		self.data = data
 		
 	def execute(self):
-		Unit0.unitDestroy(self.deletedUnit)
+		Unit0.unitDestroy(self.data)
 		print("Unit lost.")
 
-class EventUnitHealthCheck(GameEvent):
+class EventUnitHPCheck(GameEvent):
 	def execute(self):
 		for Unit in Unit0.UNITARRAY:
-			if Unit.statHealth <= 0:
+			if Unit.statHP <= 0:
 				Event0.eventAdd("EventUnitDestroy", Unit)
-		print("Health checked.")
+			if Unit.statHP > Unit.statMaxHP:
+				Unit.statHP = Unit.statMaxHP
+		print("HP checked.")
 
 class EventUnitMove(GameEvent):
+	def __init__(self, data):
+		self.data = data
+		
 	def execute(self):
-		Unit0.unitMove()
+		Unit0.unitMove(self.data)
 		print("Moved units.")
 
 class EventUnitAttack(GameEvent):
@@ -113,13 +136,14 @@ class EventUnitAttack(GameEvent):
 		self.attackingUnit = data
 	
 	def execute(self):
-		if isinstance(self.attackingUnit, Tank):
-			if self.attackingUnit.targetedUnit != None:
-				self.attackingUnit.targetedUnit.statHealth -= self.attackingUnit.statDamage
+		if self.attackingUnit in Unit0.TANKS or self.attackingUnit in Unit0.ENGINEERS:
+			targetedUnit = self.attackingUnit.targetedUnit
+			if targetedUnit != None:
+				targetedUnit.statHP -= self.attackingUnit.statDamage - targetedUnit.statArmor
 				self.attackingUnit.targetedUnit = None
-		elif isinstance(self.attackingUnit, Artillery):
+		elif self.attackingUnit in Unit0.ARTILLERY:
 			targetedUnit = Map0.getUnit(self.attackingUnit.targetedCoord)
-			if targetedUnit != -1:
-				targetedUnit.statHealth -= self.attackingUnit.statDamage
+			if targetedUnit != None:
+				targetedUnit.statHP -= self.attackingUnit.statDamage - targetedUnit.statArmor
 			self.attackingUnit.targetedCoord = [None]
 		print("A unit is (probably) under attack!")

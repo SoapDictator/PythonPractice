@@ -1,5 +1,6 @@
-import pygame, sys, math
+import pygame, sys
 from pygame.locals import *
+from AD_unit import *
 
 class InputManager(object):
 	inputState = ['moveSelection', 'unitSelected', 'unitTarget']
@@ -41,8 +42,9 @@ class InputManager(object):
 					elif event.key == K_e:	Event0.eventHandle()
 					elif event.key == K_z:		Event0.eventUndo()
 			elif self.getState() == 'unitSelected':
-				if pygame.mouse.get_pressed() == (0, 0, 1):
-					path = Map0.getPath(Unit0.SELECTEDUNIT.statSpeed, Unit0.SELECTEDUNIT.statCoord, Window0.pixeltohex(pygame.mouse.get_pos()))
+				if pygame.mouse.get_pressed() == (1, 0, 0):
+					coord = Window0.pixeltohex(pygame.mouse.get_pos())
+					path = Map0.getPath(Unit0.SELECTEDUNIT.statSpeed, Unit0.SELECTEDUNIT.statCoord, coord)
 					Unit0.MOVEQUEUE[Unit0.SELECTEDUNIT.arrayPos] = path[::-1]
 					self.setState(0)
 				if event.type == KEYDOWN:
@@ -51,9 +53,15 @@ class InputManager(object):
 					elif event.key == K_z:			Event0.eventUndo()
 			elif self.getState() == 'unitTarget':
 				if pygame.mouse.get_pressed() == (1, 0, 0):
-					area = Map0.getRing(Unit0.SELECTEDUNIT.statFR, Unit0.SELECTEDUNIT.statCoord, width = 0)
+					if isinstance(Unit0.SELECTEDUNIT, Tank) or isinstance(Unit0.SELECTEDUNIT, Engineer):
+						FR = Unit0.SELECTEDUNIT.statFR
+					elif isinstance(Unit0.SELECTEDUNIT, Artillery):
+						FR = Unit0.SELECTEDUNIT.statMaxFR
+					else:
+						FR = 0
+						
 					coord = Window0.pixeltohex(pygame.mouse.get_pos())
-					if area.has_key((coord[0], coord[1])):
+					if Map0.getDistance(Unit0.SELECTEDUNIT.statCoord, coord) <= FR:
 						isok = Unit0.SELECTEDUNIT.targetChange(coord)
 						if isok:
 							self.setState(1)

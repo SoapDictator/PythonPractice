@@ -1,4 +1,5 @@
 import sys, math, pygame
+from AD_unit import *
 
 class DrawingManager(object):
 	FPS = 0
@@ -23,6 +24,13 @@ class DrawingManager(object):
 		self.DISPLAYSURF = pygame.display.set_mode((self.WINDOWWIDTH, self.WINDOWHEIGHT))
 		self.BASICFONT = pygame.font.Font('freesansbold.ttf', 12)
 		pygame.display.set_caption('AD')
+		
+		h = float(self.CELLSIZE)
+		w = 1.732*0.5 * h
+		self.PIXELPOINTS =	[[0, 0.5*h], [0.5*w, 0.25*h], [0.5*w, -0.25*h], 
+										[0, -0.5*h], [-0.5*w, -0.25*h], [-0.5*w, 0.25*h]]
+		self.PIXELEDGES =	[[-0.25*w, 0.375*h], [-0.5*w, 0], [-0.25*w, -0.375*h], 
+										[0.25*w, -0.375*h], [0.5*w, 0], [0.25*w, 0.375*h]]
 
 	#takes settings frrom config.txt
 	def screenConfig(self):
@@ -48,7 +56,7 @@ class DrawingManager(object):
 										(0.5+self.MAPRADIUS*0.75)*self.CELLSIZE]
 	
 	def screenColors(self):
-		#								R		G		B
+		#									R		G		B
 		self.WHITE				= (255, 255, 255)
 		self.BLACK				= (    0,     0,     0)
 		self.LIGHTBLUE		= (180, 180, 255)
@@ -56,11 +64,11 @@ class DrawingManager(object):
 		self.LIGHTRED			= (205,   92,   92)
 		self.RED					= (220,     0,     0)
 		self.DARKRED			= (120,     0,     0)
-		self.GREEN				= (  34, 180,    34)
+		self.GREEN				= (  34, 180,   34)
 		self.YELLOW			= (220, 220,     0)
 		self.GREENYELLOW	= (173, 220,   47)
 		self.LIGHTGRAY		= (150, 150, 150)
-		self.DARKGREY			= (60, 60, 60)
+		self.DARKGREY			= (  60,   60,   60)
 		self.BGCOLOR	= self.DARKGREY
 		
 	def hextopixel(self, hex):
@@ -95,16 +103,12 @@ class DrawingManager(object):
 	
 	#draws a single hex; width=1 will draw an outline, width=0 draws a solid figure
 	def drawHex(self, hex, color = [255, 255, 255], width = 1):
-		h = float(self.CELLSIZE)
-		w = 1.732*0.5 * h
-		directions_pixel = [[0, 0.5*h], [0.5*w, 0.25*h], [0.5*w, -0.25*h], 
-									[0, -0.5*h], [-0.5*w, -0.25*h], [-0.5*w, 0.25*h]]
 		pixelhex = self.hextopixel(hex)
 		points = []
 		
 		for i in range(0, 6):
-			points.append([pixelhex[0]+directions_pixel[i][0], 
-									pixelhex[1]+directions_pixel[i][1]])
+			points.append([pixelhex[0]+self.PIXELPOINTS[i][0], 
+									pixelhex[1]+self.PIXELPOINTS[i][1]])
 		pygame.draw.polygon(self.DISPLAYSURF, color, points, width)
 		
 		#displays the coordinates on the hex itself
@@ -128,7 +132,8 @@ class DrawingManager(object):
 			X = pixelOrigin[0] - int(pixelDiv[0]*i)
 			Y = pixelOrigin[1] - int(pixelDiv[1]*i)
 			pygame.draw.circle(self.DISPLAYSURF, color, [X, Y], 3)
-		
+	
+	#draws all hexes or their outlines using one color
 	def drawGrid(self, color = [255, 255, 255], width = 1):
 		for q in range(-self.MAPRADIUS, self.MAPRADIUS+1):
 			r1 = max(-self.MAPRADIUS, -q-self.MAPRADIUS)
@@ -139,34 +144,63 @@ class DrawingManager(object):
 
 	#draws EVERYTHING again on each frame
 	def screenRefresh(self):
+		#fills the background with a single color
 		self.DISPLAYSURF.fill(self.BGCOLOR)
+		#draws all hexes on the map with one color
 		self.drawGrid(self.LIGHTGRAY, 0)
 		
-		for unit in Unit0.UNITARRAY:
-			for hex in Map0.getVisibility(unit.statVR, unit.statCoord):
-				self.drawHex(hex, (200, 200, 200), 0)
+		#draws visible for the selected player hexes
+		for hex in Unit0.PLAYERFOV[Unit0.SELECTEDPLAYER]:
+			self.drawHex(hex, (200, 200, 200), 0)
 		
+		#draws possible movement options and a calculated path to chosen destination
 		if Input0.getState() == 'unitSelected':
 			for hex in Map0.getRing(Unit0.SELECTEDUNIT.statSpeed, Unit0.SELECTEDUNIT.statCoord, width = 0, MO = True):
 				self.drawHex(hex, self.LIGHTBLUE, 0)
 			for hex in Map0.getPath(Unit0.SELECTEDUNIT.statSpeed, Unit0.SELECTEDUNIT.statCoord, self.pixeltohex(pygame.mouse.get_pos())):
 				self.drawHex(hex, self.BLUE, 0)
-					
+		
+		#draws all hexes a selected unit can attack
 		if Input0.getState() == 'unitTarget':
-			for hex in Map0.getRing(Unit0.SELECTEDUNIT.statFR, Unit0.SELECTEDUNIT.statCoord, width = 0):
+			if isinstance(Unit0.SELECTEDUNIT, Tank) or isinstance(Unit0.SELECTEDUNIT, Engineer):
+				FR = Unit0.SELECTEDUNIT.statFR
+			elif isinstance(Unit0.SELECTEDUNIT, Artillery):
+				FR = Unit0.SELECTEDUNIT.statMaxFR
+			else:
+				FR = 0
+				
+			for hex in Map0.getRing(FR, Unit0.SELECTEDUNIT.statCoord, width = 0):
+				if isinstance(Unit0.SELECTEDUNIT, Artillery):
+					if hex in Map0.getRing(Unit0.SELECTEDUNIT.statMinFR, Unit0.SELECTEDUNIT.statCoord, width = 0):
+						continue
 				self.drawHex(hex, self.LIGHTRED, 0)
 		
+		#draws all MOs
 		for hex in Map0.MOARRAY:
 			self.drawHex(hex, self.DARKGREY, 0)
 		
+		#draws units visible for the selected player
 		for unit in Unit0.UNITARRAY:
-			self.drawHex(unit.statCoord, self.GREENYELLOW, 0)
-			
+			if Unit0.PLAYERARRAY[unit.owner] == Unit0.SELECTEDPLAYER:
+				self.drawHex(unit.statCoord, self.GREENYELLOW, 0)
+			else:
+				if unit.statCoord in Unit0.PLAYERFOV[Unit0.SELECTEDPLAYER]:
+					self.drawHex(unit.statCoord, self.LIGHTRED, 0)
+		
+		#redraws the units with a different color so they're visible during unit attack targeting
 		if Input0.getState() == 'unitTarget':
-			for hex in Map0.getRing(Unit0.SELECTEDUNIT.statFR, Unit0.SELECTEDUNIT.statCoord, width = 0):
-				if Map0.getUnit(hex) != None and [hex[0], hex[1]] != Unit0.SELECTEDUNIT.statCoord:
+			if isinstance(Unit0.SELECTEDUNIT, Tank):
+				FR = Unit0.SELECTEDUNIT.statFR
+			elif isinstance(Unit0.SELECTEDUNIT, Artillery):
+				FR = Unit0.SELECTEDUNIT.statMaxFR
+			else:
+				FR = 0
+			
+			for hex in Map0.getRing(FR, Unit0.SELECTEDUNIT.statCoord, width = 0):
+				if Map0.getUnit(hex) != None and [hex[0], hex[1]] != Unit0.SELECTEDUNIT.statCoord and [hex[0], hex[1]] in Unit0.PLAYERFOV[Unit0.SELECTEDPLAYER]:
 					self.drawHex(hex, self.RED, 0)
 		
+		#simply draws a hex grid of all hexes on the map
 		self.drawGrid()
 		
 		pygame.display.update()

@@ -1,4 +1,4 @@
-import pygame, sys, math
+import math
 
 class MapManager(object):
 	MAP = []
@@ -15,21 +15,11 @@ class MapManager(object):
 	
 	def __init__(self):
 		#this is currently the only way to add Movement Obsticles
-		self.MOARRAY.append([1, 0])
-		self.MOARRAY.append([-1, 0])
-		self.MOARRAY.append([-1, 1])
-		self.MOARRAY.append([0, 1])
-		self.MOARRAY.append([0, -2])
-		self.MOARRAY.append([-2, 2])
-		self.MOARRAY.append([2, 0])
-		self.MOARRAY.append([3, 0])
-		self.MOARRAY.append([4, 0])
-		self.MOARRAY.append([-1, -1])
-		self.MOARRAY.append([1, -2])
+		self.MOARRAY = [[1, 0], [-1, 0], [-1, 1], [0, 1], [0, -1]]
 	
-	#generates a graph of all possible transitions from one tile to another
+	#generates a graph of all possible transitions from one tile to another and saves all the existing coordinates
 	def createMap(self):
-		self.DIRECTIONS = [[-1, 0], [-1, +1], [0, +1],
+		self.DIRECTIONS = 	[[-1, 0], [-1, +1], [0, +1],
 										[+1, 0], [+1, -1], [0, -1]]
 	
 		for Q in range(-Window0.MAPRADIUS, Window0.MAPRADIUS+1):
@@ -78,6 +68,9 @@ class MapManager(object):
 	
 	#returns a hexes in a ring of a given radius; width=0 returns the entire circle
 	def getRing(self, limit, coord = [0, 0], width = 1, MO = False):
+		if limit == 0:
+			return [coord]
+		
 		frontier = [[coord[0], coord[1]]]
 		current = frontier[0]
 		visited = {}
@@ -96,7 +89,10 @@ class MapManager(object):
 		if width == 1:
 			return frontier
 		elif width == 0:
-			return visited
+			area = []
+			for hex in visited:
+				area.append(list(hex))
+			return area
 	
 	#returns a unit in a given coordiante if it's there, otherwise returns None
 	def getUnit(self, coord):
@@ -137,46 +133,41 @@ class MapManager(object):
 			current = came_from[current[0], current[1]][0]
 			path.append(current)
 		return path
-		
+	
 	def getVisibility(self, limit, coord):
-		isVisible = []
+		isVisible = [[coord[0], coord[1]]]
+		MOedges = []
 		pixelOrigin = Window0.hextopixel(coord)
 		
-		for target in self.getRing(limit, coord, 0):
-			breakFlag = 0
-			pixelTarget = Window0.hextopixel(target)
+		for hex in self.MOARRAY:
+			pixelhex = Window0.hextopixel(hex)
+			for edge in Window0.PIXELEDGES:
+				Q = int(pixelhex[0] + edge[0])
+				R = int(pixelhex[1] + edge[1])
+				MOedges.append([Q, R])
 		
-			N = self.getDistance(coord, target)
-			pixelN = [pixelOrigin[0]-pixelTarget[0], pixelOrigin[1]-pixelTarget[1]]
-			if N != 0:	pixelDiv = [float(pixelN[0])/N, float(pixelN[1])/N]
-			else:		pixelDiv = [0, 0]
-		
-			for i in range(0, N+1):	
-				Q = pixelOrigin[0] - int(pixelDiv[0]*i)
-				R = pixelOrigin[1] - int(pixelDiv[1]*i)
-				hexr = (R - Window0.POINTCENTER[1]) / (Window0.CELLSIZE/2 * 1.5)
-				hexq = (Q - Window0.POINTCENTER[0]) / (Window0.CELLSIZE/2 * math.sqrt(3)) - hexr*0.5
+		for k in range(0, limit+1): #for whatever reason getRing with width=0 does not work with this algoritm
+			for target in self.getRing(k, coord, 1):
+				breakFlag = 0
+				pixelTarget = Window0.hextopixel(target)
 				
-				rq = round(hexq)
-				rr = round(hexr)
-				rs = round(-hexq-hexr)
-				
-				dq = abs(rq - hexq)
-				dr = abs(rr - hexr)
-				ds = abs(rs + hexq + hexr)
-				
-				if dq > ds and dq > dr:
-					rq = -rs-rr
-				elif ds > dr:
-					pass
-				else:
-					rr = -rq-rs
-				
-				if [rq, rr] in self.MOARRAY:
-					break
-				breakFlag += 1
+				N = self.getDistance(coord, target)*2
+				pixelN = [pixelOrigin[0]-pixelTarget[0], pixelOrigin[1]-pixelTarget[1]]
+				if N != 0:	pixelDiv = [float(pixelN[0])/N, float(pixelN[1])/N]
+				else:		break
 			
-			if breakFlag == N+1:
-				isVisible.append([target[0], target[1]])
+				for i in range(2, N+1):	#ignore the first value, it always will be the unit's coordinates
+					flag = False
+					Q = int(pixelOrigin[0] - pixelDiv[0]*i)
+					R = int(pixelOrigin[1] - pixelDiv[1]*i)
+					
+					for edge in MOedges:
+						if (Q-2 <= edge[0] and Q+2 >= edge[0]) and (R-2 <= edge[1] and R+2 >= edge[1]):
+							flag = True
+					if flag: break
+					breakFlag += 1
+				
+				if breakFlag == N-1:
+					isVisible.append([target[0], target[1]])
 		
 		return isVisible

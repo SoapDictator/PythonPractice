@@ -2,26 +2,47 @@ import pygame, sys, math
 from pygame.locals import *
 
 class UnitManager(object):
-	global SELECTEDUNIT
 	UNITARRAY = []	#array of ALL units on the map
 	MOVEQUEUE = []	#array of ALL movement queues of ALL units, position of the movement queue is determined by a unit's position in UNITARRAY
-	SELECTEDUNIT = None	#currently selected unit, default value is "-1"; needs to be reseted after the unit is deselected
+	SCOUTS = []
+	TANKS = []
+	ARTILLERY = []
+	ENGINEERS = []
 	
-	def defineGlobals(self, DrawingManager, MapManager):
-		global Window0, Map0
+	PLAYERARRAY = {}	#array of all players; defines unit ownership
+	SELECTEDPLAYER = None
+	SELECTEDUNIT = None	#currently selected unit; needs to be reseted after the unit is deselected
+	
+	PLAYERFOV = [[], []]
+	
+	def __init__(self):
+		self.PLAYERARRAY["player1"] = 0
+		self.PLAYERARRAY["player2"] = 1
+		self.SELECTEDPLAYER = self.PLAYERARRAY["player1"]
+	
+	def defineGlobals(self, DrawingManager, MapManager, UnitManager):
+		global Window0, Map0, Unit0
 		Window0 = DrawingManager
 		Map0 = MapManager
+		Unit0 = UnitManager
 	
 	#creates a new unit and adds it to the UNITARRAY as well as creates an entry in MOVEQUEUE; new unit will always be the last one in the array
-	def unitCreate(self, unitType, toX, toY):
+	def unitCreate(self, unitType, coord, player):
+		toX = coord[0]
+		toY = coord[1]
 		if unitType == "Scout":
 			NewUnit = Scout()
+			self.SCOUTS.append(NewUnit)
 		elif unitType == "Tank":
 			NewUnit = Tank()
+			self.TANKS.append(NewUnit)
 		elif unitType == "Artillery":
 			NewUnit = Artillery()
+			self.ARTILLERY.append(NewUnit)
 		elif unitType == "Engineer":
 			NewUnit = Engineer()
+			self.ENGINEERS.append(NewUnit)
+		NewUnit.owner = player
 		self.UNITARRAY.append(NewUnit)
 		NewUnit.arrayPos = len(self.UNITARRAY)-1
 		
@@ -64,13 +85,13 @@ class UnitManager(object):
 								del self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
 								#del self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
 	
-	#moves all units according to their movement queues in MOVEQUEUE
-	def unitMove(self):
+	#moves units according to their movement queues in MOVEQUEUE
+	def unitMove(self, units):
 		self.moveResolveCollision()
 		stopFlag = [0]*len(self.MOVEQUEUE)
 		sum = 0
 		for step in range(1, 50):
-			for UNIT in self.UNITARRAY:
+			for UNIT in units:
 				if len(self.MOVEQUEUE[UNIT.arrayPos]) == 1:
 					stopFlag[UNIT.arrayPos] = 1
 					continue
@@ -81,30 +102,42 @@ class UnitManager(object):
 				UNIT.statCoord[1] = self.MOVEQUEUE[UNIT.arrayPos][step][1]
 			for flag in stopFlag:
 				sum += flag
-			if sum == len(self.MOVEQUEUE):
+			if sum == len(units):
 				break
 			sum = 0
-			pygame.time.wait(100)
+			pygame.time.wait(75)
 			Window0.screenRefresh()
 		
-		for UNIT in self.UNITARRAY:
+		for UNIT in units:
 			self.MOVEQUEUE[UNIT.arrayPos][0] = [UNIT.statCoord[0], UNIT.statCoord[1]]
 			del self.MOVEQUEUE[UNIT.arrayPos][1:len(self.MOVEQUEUE[UNIT.arrayPos])]
+	
+	def unitFOV(self):
+		for unit in self.UNITARRAY:
+			for hex in Map0.getVisibility(unit.statVR, unit.statCoord):
+				if hex not in self.PLAYERFOV[self.PLAYERARRAY[unit.owner]]:
+					self.PLAYERFOV[self.PLAYERARRAY[unit.owner]].append(hex)
 
 #------------------------------------------
 		
 class Unit(object):
 	statCoord = [0, 0]
-	statHealth = 10
-	statArmor = 0
-	statSpeed = 5
-	statVR = 3
 	arrayPos = 0
+	owner = None
 	
 class Scout(Unit):
-	pass
+	statMaxHP = 6
+	statHP = statMaxHP
+	statArmor = 0
+	statSpeed = 5
+	statVR = 5
 		
 class Tank(Unit):
+	statMaxHP = 10
+	statHP = statMaxHP
+	statArmor = 2
+	statSpeed = 4
+	statVR = 3
 	statDamage = 10
 	statFR = 3
 	statAmmoCap = 10
@@ -112,15 +145,20 @@ class Tank(Unit):
 		
 	def targetChange(self, coord):
 		if self.statAmmoCap != 0:
-			targetedUnit = Map0.getUnit(coord)
-			if targetedUnit != None and targetedUnit != SELECTEDUNIT:
-				if Map0.getDistance(self.statCoord, targetedUnit.statCoord) <= SELECTEDUNIT.statFR:
+			if Map0.getDistance(self.statCoord, coord) <= self.statFR and coord in Unit0.PLAYERFOV[0]:
+				targetedUnit = Map0.getUnit(coord)
+				if targetedUnit != None and targetedUnit != self:
 					self.targetedUnit = targetedUnit
 					return True
 		return False
 
 class Artillery(Unit):
-	statDamage = 10
+	statMaxHP = 8
+	statHP = statMaxHP
+	statArmor = 0
+	statSpeed = 4
+	statVR = 2
+	statDamage = 12
 	statMinFR = 2
 	statMaxFR = 5
 	statAmmoCap = 10
@@ -129,11 +167,26 @@ class Artillery(Unit):
 	def targetChange(self, coord):
 		if self.statAmmoCap != 0:
 			targetedCoord = [coord[0], coord[1]]
-			if Map0.getDistance(self.statCoord, targetedCoord) > SELECTEDUNIT.statMinFR and Map0.getDistance(self.statCoord, targetedCoord) <= SELECTEDUNIT.statMaxFR:
+			dist = Map0.getDistance(self.statCoord, targetedCoord)
+			if dist > self.statMinFR and dist <= self.statMaxFR:
 				self.targetedCoord = targetedCoord
 				return True
 		return False
 		
 class Engineer(Unit):
-	statDamage = 5
-	statFR = 5
+	statMaxHP = 12
+	statHP = statMaxHP
+	statArmor = 1
+	statSpeed = 3
+	statVR = 2
+	statDamage = -5
+	statFR = 3
+	targetedUnit = None
+	
+	def targetChange(self, coord):
+		if Map0.getDistance(self.statCoord, coord) <= self.statFR and coord in Unit0.PLAYERFOV[0]:
+			targetedUnit = Map0.getUnit(coord)
+			if targetedUnit != None and targetedUnit != self:
+				self.targetedUnit = targetedUnit
+				return True
+		return False

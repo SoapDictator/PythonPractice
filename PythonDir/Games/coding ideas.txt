@@ -1,58 +1,57 @@
 main #runs the entire game
 ->coupled with everything
 	+main cycle
-	+management classes' initializations
-	+(?) game state machine #so basically it describes the turn "playback" as well as it definds "binds"
+	+management classes' initializations and their interconnections
 
+event management
+-> map management
+-> unit management
+	+adds events such as movement, attacks, health checks, etc.
+	+handles events
+	+determines the action order for proper turn structure
+	-event queue
+	
 unit management class #controls the selection, adding/removing units, etc.
--> drawing management
 -> map management
 	+create unit
 	+destroy unit
-	+move unit #stores and executes unit's movement
-	+(?)draw unit #get a unit type from the unit and draws its pattern
-	-movement queue #have a huge array for every unit on the map, needs to be carefully managed
+	+move units
+	+resolve movement collisions
+	-units array containing all units currently existing
+	-movement queues array containing a queue for each unit
+	-currently selected unit
 
 drawing management class #so window drawing and unit drawin is separate? make the drawing heirarcy
 -> unit management
--> (?) map management
--> (?)gui #probably just draw the gui here, but configure it in another class
+-> map management
+	-constants required for drawing the window and everything on it
 
 input management class #keyboard, mouse management, command pattern is king
 -> unit management
 -> map management
--> gui
-	+manages inputs from keyboard and sends them elsewhere
-	+has input states
-
-gui class #supposed to be separate from the drawing management class
--> drawing management
--> input management
--> (?) map class #it's part of GUI, selection and everything, but merging the two is a bad idea
-	+ties user interface to the interactions #duh
+	+state machine for inputs
+	+manages inputs from keyboard and mouse
+	-input states
+	-currently used input state
 
 map management class #returns the infomation about particular things being in particular places
--> (?) gui
 -> unit management
--> input management
--> (?) drawing management#partially and more from a gui standpoint
-	+can get you a unit
-	+can find a proper limits for the unit's movement	#use a VO list and place all VOs in there
-	+can place and calculate the field of view
-	-Movement Obstacle array
+-> drawing management #partially and more from a gui standpoint
 	-Vision Obstacle array
+	-Movement Obstacle array
+	-the entire map as an array
+	-neighbours graph each node containing every single neighboring hex with the selected one
 
 unit class
--> drawing pattern of a specific unit
 -> unit management
+-> map management
 	-stats (health, armor, speed, damage, AC, FR, VR)
 	-active buff/debuff #just a list that autoresolves in the end of the turn
-	-movement queue #i will probably move it to the unit management and create one huge queue for everyone
+	-current attack target (not all of themwill have one)
 
 ###
 
 game events:	#exclusively unit interactions
-	- (?)terminate	#i don't think i needed this to begin with
 	- unitMove
 	- unitAttack
 	- unitCreate
@@ -69,16 +68,20 @@ input states:	#some game events are able to switch those around
 ###
 
 TODO:
-	- add a function that will determine the color of the hex so it won't draw hexes on top of each other 50 times over
+	# - add a function that will determine the color of the hex so it won't draw hexes on top of each other 50 times over
+	# - add illlustration of each unit's action (movement, attack, etc.)
+	- add the action condiditons check (artillery moving will prevent it from shooting in the same turn and vice versa, for example)
 	- fix the attack function to add the ability of undoing attack
-	- fix colision resolver to properly resolve scenarios when 2 units with the same speed move in the same line
-	- add function(s) to draw all units
-	- fix field of view calculation
-	- add the turn structure (Preturn, First Half, Second Half, Postturn)
-	- add the team structure (and, therefore, friendly/enemy actions' conditions)
-	#- look up how to do GUI
+	# - fix colision resolver to properly resolve scenarios when 2 units with the same speed move in the same line
+	# - look up how to do vector graphics in Pygame
+	#- make a basic GUI for easier interactions with units
 	#- implement some existing units and add their abilities
-	#- figure out how to calculate the armor damage reduction properly
 
 DONE:
-	=	separated the main file to several, each containing its own manager
+	= added Engineer core ability
+	= fixed the... documentation(?) so i don't have to find out every time why stuff is where it is
+	= added the team structure (probably needs further work to make it more coherent)
+	= added the turn structure (currently completely broken, needs reworking)
+	= added visibility checks for units' actions
+	= added visibility checks for drawing units
+	= fixed FOV calculation

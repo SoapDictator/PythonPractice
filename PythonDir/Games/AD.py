@@ -22,11 +22,11 @@ class Main(object):
 		Unit0 = UnitManager()
 		Map0 = MapManager()
 		
-		Event0.defineGlobals(Map0, Unit0)
+		Event0.defineGlobals(Event0, Map0, Unit0)
 		Window0.defineGlobals(Input0, Map0, Unit0)	
 		Input0.defineGlobals(Event0, Window0, Map0, Unit0)
 		Map0.defineGlobals(Window0, Unit0)
-		Unit0.defineGlobals(Window0, Map0)
+		Unit0.defineGlobals(Window0, Map0, Unit0)
 		
 		self.test()
 		
@@ -36,8 +36,8 @@ class Main(object):
 			Window0.FPSCLOCK.tick(Window0.FPS)
 	
 	def test(self):
-		Event0.eventAdd("EventUnitCreate", ("Tank", [0, 0]))
-		Event0.eventAdd("EventUnitCreate", ("Tank", [3, 1]))
+		Event0.eventAdd("EventUnitCreate", ("Tank", [0, 0], "player1"))
+		Event0.eventAdd("EventUnitCreate", ("Artillery", [3, 1], "player1"))
 		Event0.eventHandle()
 
 StartShenanigans = Main()
