@@ -22,7 +22,7 @@ class GameEventManager(object):
 				priority = 0
 		elif eventName == "EventUnitHPCheck":
 			event = EventUnitHPCheck()
-			priority = 12
+			priority = 32
 		elif eventName == "EventUnitCreate":
 			event = EventUnitCreate(data)
 			priority = 13
@@ -52,8 +52,12 @@ class GameEventManager(object):
 					for i in range(1, len(self.EVENTQUEUE)):
 						if self.EVENTQUEUE[i-1][1] <= priority and self.EVENTQUEUE[i][1] >= priority:
 							self.EVENTQUEUE.insert(i, [event, priority])
+							break
 			else:
-				self.EVENTQUEUE.append([event, priority])
+				if len(self.EVENTQUEUE) == 1 and self.EVENTQUEUE[0][1] > priority:
+					self.EVENTQUEUE.insert(0, [event, priority])
+				else:
+					self.EVENTQUEUE.append([event, priority])
 			self.LASTADDEDEVENT = event
 	
 	def eventUndo(self):
@@ -138,12 +142,10 @@ class EventUnitAttack(GameEvent):
 	def execute(self):
 		if self.attackingUnit in Unit0.TANKS or self.attackingUnit in Unit0.ENGINEERS:
 			targetedUnit = self.attackingUnit.targetedUnit
-			if targetedUnit != None:
-				targetedUnit.statHP -= self.attackingUnit.statDamage - targetedUnit.statArmor
-				self.attackingUnit.targetedUnit = None
+			self.attackingUnit.targetedUnit = None
 		elif self.attackingUnit in Unit0.ARTILLERY:
 			targetedUnit = Map0.getUnit(self.attackingUnit.targetedCoord)
-			if targetedUnit != None:
-				targetedUnit.statHP -= self.attackingUnit.statDamage - targetedUnit.statArmor
 			self.attackingUnit.targetedCoord = [None]
+		if targetedUnit != None:
+			targetedUnit.statHP -= self.attackingUnit.statDamage - targetedUnit.statArmor
 		print("A unit is (probably) under attack!")

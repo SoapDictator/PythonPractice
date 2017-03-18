@@ -52,11 +52,28 @@ class UnitManager(object):
 	def unitDestroy(self, deletedUnit):
 		del self.UNITARRAY[deletedUnit.arrayPos]
 		del self.MOVEQUEUE[deletedUnit.arrayPos]
-		for UNIT in self.UNITARRAY: 	#shifts all tanks situated after the deleted one in the array, since the MOVEQUEUE position is tracked by arrayPos
-			if deletedUnit.arrayPos < UNIT.arrayPos:
+		for UNIT in self.UNITARRAY: 
+			if deletedUnit.arrayPos < UNIT.arrayPos:	#shifts all tanks situated after the deleted one in the array, since the MOVEQUEUE position is tracked by arrayPos
 				UNIT.arrayPos -= 1
+		for i in range(0, 50):	#ducktape to delete the unit from the according type array
+			if i < len(self.SCOUTS):
+				if deletedUnit == self.SCOUTS[i]:
+					del self.SCOUTS[i]
+					break
+			if i < len(self.TANKS):
+				if deletedUnit == self.TANKS[i]:
+					del self.TANKS[i]
+					break
+			if i < len(self.ARTILLERY):
+				if deletedUnit == self.ARTILLERY[i]:
+					del self.ARTILLERY[i]
+					break
+			if i < len(self.ENGINEERS):
+				if deletedUnit == self.ENGINEERS[i]:
+					del self.ENGINEERS[i]
+					break
 	
-	#resolves situations when 2 or more units are trying to take the same final position
+	#resolves situations when 2 or more units are trying to travel to the same final position
 	def moveResolveCollision(self):
 		for UNIT in self.UNITARRAY:
 			#checking all units which are moving this turn
@@ -158,7 +175,7 @@ class Artillery(Unit):
 	statArmor = 0
 	statSpeed = 4
 	statVR = 2
-	statDamage = 12
+	statDamage = 11
 	statMinFR = 2
 	statMaxFR = 5
 	statAmmoCap = 10

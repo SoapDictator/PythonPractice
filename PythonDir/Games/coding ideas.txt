@@ -68,6 +68,8 @@ input states:	#some game events are able to switch those around
 ###
 
 TODO:
+	? - add a reference table so it will be possible to find units in SCOUTS, TANKS, etc.
+	- rework the turn structure to properly calculate priorities
 	# - add a function that will determine the color of the hex so it won't draw hexes on top of each other 50 times over
 	# - add illlustration of each unit's action (movement, attack, etc.)
 	- add the action condiditons check (artillery moving will prevent it from shooting in the same turn and vice versa, for example)
@@ -78,10 +80,4 @@ TODO:
 	#- implement some existing units and add their abilities
 
 DONE:
-	= added Engineer core ability
-	= fixed the... documentation(?) so i don't have to find out every time why stuff is where it is
-	= added the team structure (probably needs further work to make it more coherent)
-	= added the turn structure (currently completely broken, needs reworking)
-	= added visibility checks for units' actions
-	= added visibility checks for drawing units
-	= fixed FOV calculation
+	= fixed the current ducktape of a turn structure
