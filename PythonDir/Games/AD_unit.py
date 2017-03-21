@@ -50,28 +50,21 @@ class UnitManager(object):
 		self.MOVEQUEUE.append([[toX, toY]])
 	
 	def unitDestroy(self, deletedUnit):
-		del self.UNITARRAY[deletedUnit.arrayPos]
-		del self.MOVEQUEUE[deletedUnit.arrayPos]
+		arrayPos = deletedUnit.arrayPos
+		del self.UNITARRAY[arrayPos]
+		del self.MOVEQUEUE[arrayPos]
+		if deletedUnit in Unit0.SCOUTS:
+			del Unit0.SCOUTS[Unit0.SCOUTS.index(deletedUnit)]
+		elif deletedUnit in Unit0.TANKS:
+			del Unit0.TANKS[Unit0.TANKS.index(deletedUnit)]
+		elif deletedUnit in Unit0.ARTILLERY:
+			del Unit0.ARTILLERY[Unit0.ARTILLERY.index(deletedUnit)]
+		elif deletedUnit in Unit0.ENGINEERS:
+			del Unit0.ENGINEERS[Unit0.ENGINEERS.index(deletedUnit)]
+		
 		for UNIT in self.UNITARRAY: 
-			if deletedUnit.arrayPos < UNIT.arrayPos:	#shifts all tanks situated after the deleted one in the array, since the MOVEQUEUE position is tracked by arrayPos
+			if arrayPos < UNIT.arrayPos:	#shifts all tanks situated after the deleted one in the array, since the MOVEQUEUE position is tracked by arrayPos
 				UNIT.arrayPos -= 1
-		for i in range(0, 50):	#ducktape to delete the unit from the according type array
-			if i < len(self.SCOUTS):
-				if deletedUnit == self.SCOUTS[i]:
-					del self.SCOUTS[i]
-					break
-			if i < len(self.TANKS):
-				if deletedUnit == self.TANKS[i]:
-					del self.TANKS[i]
-					break
-			if i < len(self.ARTILLERY):
-				if deletedUnit == self.ARTILLERY[i]:
-					del self.ARTILLERY[i]
-					break
-			if i < len(self.ENGINEERS):
-				if deletedUnit == self.ENGINEERS[i]:
-					del self.ENGINEERS[i]
-					break
 	
 	#resolves situations when 2 or more units are trying to travel to the same final position
 	def moveResolveCollision(self):
@@ -142,6 +135,9 @@ class Unit(object):
 	arrayPos = 0
 	owner = None
 	
+	def addMoveQueue(self, queue):
+		Unit0.MOVEQUEUE[self.arrayPos] = queue[:]
+	
 class Scout(Unit):
 	statMaxHP = 6
 	statHP = statMaxHP
@@ -187,8 +183,14 @@ class Artillery(Unit):
 			dist = Map0.getDistance(self.statCoord, targetedCoord)
 			if dist > self.statMinFR and dist <= self.statMaxFR:
 				self.targetedCoord = targetedCoord
+				Unit0.MOVEQUEUE[self.arrayPos] = [self.statCoord[:]]	#deleting the movement queue to prevent movement in the same turn
 				return True
 		return False
+	
+	def addMoveQueue(self, queue):
+		super(Artillery, self).addMoveQueue(queue)
+		self.targetedCoord = [None]	#deletes the targeted coordinate to prevent attacking in the same turn
+		
 		
 class Engineer(Unit):
 	statMaxHP = 12

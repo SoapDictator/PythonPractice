@@ -141,6 +141,10 @@ class DrawingManager(object):
 			
 			for r in range(r1, r2+1):
 				self.drawHex([q, r], color, width)
+				textsurf = self.BASICFONT.render('%s, %s' % (q, r), True, self.WHITE)
+				textrect = textsurf.get_rect()
+				textrect.center = (self.hextopixel([q, r]))
+				self.DISPLAYSURF.blit(textsurf, textrect)
 
 	#draws EVERYTHING again on each frame
 	def screenRefresh(self):
@@ -199,6 +203,20 @@ class DrawingManager(object):
 			for hex in Map0.getRing(FR, Unit0.SELECTEDUNIT.statCoord, width = 0):
 				if Map0.getUnit(hex) != None and [hex[0], hex[1]] != Unit0.SELECTEDUNIT.statCoord and [hex[0], hex[1]] in Unit0.PLAYERFOV[Unit0.SELECTEDPLAYER]:
 					self.drawHex(hex, self.RED, 0)
+					
+		#draws movement queues and attack targets for owned units
+		for unit in Unit0.UNITARRAY:
+			if Unit0.PLAYERARRAY[unit.owner] == Unit0.SELECTEDPLAYER:
+				if unit in Unit0.TANKS or unit in Unit0.ENGINEERS:
+					if unit.targetedUnit != None:
+						self.drawLine(unit.statCoord, unit.targetedUnit.statCoord, self.RED)
+				elif unit in Unit0.ARTILLERY:
+					if unit.targetedCoord != [None]:
+						self.drawLine(unit.statCoord, unit.targetedCoord, self.RED)
+				
+				path = Unit0.MOVEQUEUE[unit.arrayPos]
+				for i in range(1, len(path)):
+					self.drawLine(path[i-1], path[i], self.BLUE)
 		
 		#simply draws a hex grid of all hexes on the map
 		self.drawGrid()

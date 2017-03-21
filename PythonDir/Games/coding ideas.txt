@@ -69,15 +69,15 @@ input states:	#some game events are able to switch those around
 
 TODO:
 	? - add a reference table so it will be possible to find units in SCOUTS, TANKS, etc.
-	- rework the turn structure to properly calculate priorities
 	# - add a function that will determine the color of the hex so it won't draw hexes on top of each other 50 times over
-	# - add illlustration of each unit's action (movement, attack, etc.)
-	- add the action condiditons check (artillery moving will prevent it from shooting in the same turn and vice versa, for example)
-	- fix the attack function to add the ability of undoing attack
 	# - fix colision resolver to properly resolve scenarios when 2 units with the same speed move in the same line
 	# - look up how to do vector graphics in Pygame
-	#- make a basic GUI for easier interactions with units
-	#- implement some existing units and add their abilities
+	# - make a basic GUI for easier interactions with units
+	# - implement some existing units and add their abilities
 
 DONE:
-	= fixed the current ducktape of a turn structure
+	= added a crude action condiditons check for the artillery (preventing shooting and moving during the same turn)
+	= rewrote eventUndo to include undoing attacks and movement actions of a selected unit 
+	(should probably move that to a separate function to the unit itself)
+	= reworked the turn structure to calculate priorities outside of EventAdd
+	= 	added an illlustration for movement and attack actions

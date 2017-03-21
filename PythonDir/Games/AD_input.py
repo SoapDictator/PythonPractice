@@ -19,12 +19,13 @@ class InputManager(object):
 	def setState(self, num):
 		self.currentState = self.inputState[num]
 		if num == 0:
-			 Unit0.SELECTEDUNIT = -1
+			 Unit0.SELECTEDUNIT = None
 	
 	def handleInput(self):
 		for event in pygame.event.get():	#this is chinese level of programming, needs fixing as well
 			if event.type == QUIT:
 				self.terminate()
+				
 			if self.getState() == 'moveSelection':
 				if pygame.mouse.get_pressed() == (1, 0, 0):
 					coord = Window0.pixeltohex(pygame.mouse.get_pos())
@@ -41,16 +42,19 @@ class InputManager(object):
 					if event.key == K_ESCAPE:	self.terminate()
 					elif event.key == K_e:	Event0.eventHandle()
 					elif event.key == K_z:		Event0.eventUndo()
+					
 			elif self.getState() == 'unitSelected':
 				if pygame.mouse.get_pressed() == (1, 0, 0):
 					coord = Window0.pixeltohex(pygame.mouse.get_pos())
 					path = Map0.getPath(Unit0.SELECTEDUNIT.statSpeed, Unit0.SELECTEDUNIT.statCoord, coord)
-					Unit0.MOVEQUEUE[Unit0.SELECTEDUNIT.arrayPos] = path[::-1]
+					#Unit0.MOVEQUEUE[Unit0.SELECTEDUNIT.arrayPos] = path[::-1]
+					Unit0.SELECTEDUNIT.addMoveQueue(path[::-1])
 					self.setState(0)
 				if event.type == KEYDOWN:
 					if event.key == K_ESCAPE:	self.setState(0)
-					elif event.key == K_a:		self.setState(2)
+					elif event.key == K_a:			self.setState(2)
 					elif event.key == K_z:			Event0.eventUndo()
+					
 			elif self.getState() == 'unitTarget':
 				if pygame.mouse.get_pressed() == (1, 0, 0):
 					if isinstance(Unit0.SELECTEDUNIT, Tank) or isinstance(Unit0.SELECTEDUNIT, Engineer):
