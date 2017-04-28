@@ -57,9 +57,9 @@ class InputManager(object):
 					
 			elif self.getState() == 'unitTarget':
 				if pygame.mouse.get_pressed() == (1, 0, 0):
-					if isinstance(Unit0.SELECTEDUNIT, Tank) or isinstance(Unit0.SELECTEDUNIT, Engineer):
+					if Unit0.SELECTEDUNIT in Unit0.TANKS:
 						FR = Unit0.SELECTEDUNIT.statFR
-					elif isinstance(Unit0.SELECTEDUNIT, Artillery):
+					elif Unit0.SELECTEDUNIT in Unit0.ARTILLERY:
 						FR = Unit0.SELECTEDUNIT.statMaxFR
 					else:
 						FR = 0
@@ -77,6 +77,6 @@ class InputManager(object):
 						self.setState(1)
 
 	def terminate(self):
-		print("Terminated.")
+		print("Terminated on turn %s.\n" % Event0.TURNCOUNTER)
 		pygame.quit()
 		sys.exit()

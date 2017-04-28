@@ -45,9 +45,12 @@ map management class #returns the infomation about particular things being in pa
 unit class
 -> unit management
 -> map management
-	-stats (health, armor, speed, damage, AC, FR, VR)
+	+add movement queue
+	+cast ability
+	-stats (health, armor, speed, damage, AC, FR, VR, abilities)
+	-activated abilities #list of ability class instances that will be used during the turn
 	-active buff/debuff #just a list that autoresolves in the end of the turn
-	-current attack target (not all of themwill have one)
+	-current attack target (not all of them will have one)
 
 ###
 
@@ -56,28 +59,45 @@ game events:	#exclusively unit interactions
 	- unitAttack
 	- unitCreate
 	- unitDestroy
-	- unitUseAbility
 	- unitHealthCheck
-	- unitAbilityCheck
+	- unitAbilityCast
 
 input states:	#some game events are able to switch those around
 	-selection movement
 	-unit movement
 	-unit attack
 
+GUI:
+	- so the basic unit interaction gui:
+		- buttons for movement and attack actions
+		- buttons for abilities' casting
+		- button for undoing all actions
+		
+	- add additional "lense" so it will be possible to look up other units' attack and movement ranges
+	(that requres proper illustration of said ranges, so i need to actually change how hex coloring works)
+	
+	- add the ability to scroll the map horizontally and vertically
+		- adding another reference coodinates for drawing, well, everything
+		(i will brobably have the scrolling values, so it'll be easy, just add scrolling to the coordinates)
+	
+	- add tooltips
+	
 ###
 
 TODO:
+	- code in the way to store temporary stat bonuses to units (have active buff array on the unit and make all stat check to add bonuses from buffs)
+	- add a function of undoing attacks and movement queue to the unit directly (and remove that functionality from the eventUndo)
+	- add a fucntion for undoing casted abilities (it will go to the ability and make isActive = False)
 	? - add a reference table so it will be possible to find units in SCOUTS, TANKS, etc.
 	# - add a function that will determine the color of the hex so it won't draw hexes on top of each other 50 times over
 	# - fix colision resolver to properly resolve scenarios when 2 units with the same speed move in the same line
 	# - look up how to do vector graphics in Pygame
-	# - make a basic GUI for easier interactions with units
-	# - implement some existing units and add their abilities
+	- make a basic GUI for easier interactions with units
+	- implement some existing units and add their abilities
 
 DONE:
-	= added a crude action condiditons check for the artillery (preventing shooting and moving during the same turn)
-	= rewrote eventUndo to include undoing attacks and movement actions of a selected unit 
-	(should probably move that to a separate function to the unit itself)
-	= reworked the turn structure to calculate priorities outside of EventAdd
-	= 	added an illlustration for movement and attack actions
+	= added ability mechanics into the game
+	= replaced engineer's "attack" with a proper healing ability "EngieHeal" (now it will properly heal units)
+	= added a passive ammo replenishing ability to the engineer
+	= reworked eventAdd function (no longer has hard-coded instance constructor)
+	= reworked unitCreate to add abilities upon creation and it now doesn't include hard-code

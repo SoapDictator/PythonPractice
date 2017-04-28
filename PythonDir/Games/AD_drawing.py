@@ -39,11 +39,13 @@ class DrawingManager(object):
 			if "FPS = " in line:
 				self.FPS = float(line[6:9])
 			elif "WINDOWWIDTH = " in line:
-				self.WINDOWWIDTH = int(line[14:18])
+				self.WINDOWWIDTH = int(line[14:])
 			elif "WINDOWHEIGHT = " in line:
-				self.WINDOWHEIGHT = int(line[15:19])
+				self.WINDOWHEIGHT = int(line[15:])
 			elif "CELLSIZE = " in line:
-				self.CELLSIZE = int(line[11:15])
+				self.CELLSIZE = int(line[11:])
+			elif "MAPRADIUS = " in line:
+				self.MAPRADIUS = int(line[12:])
 		
 		#assert self.WINDOWWIDTH % self.CELLSIZE == 0
 		#assert self.WINDOWHEIGHT % self.CELLSIZE == 0
@@ -51,7 +53,6 @@ class DrawingManager(object):
 		self.CELLWIDTH = int(self.WINDOWWIDTH / self.CELLSIZE)
 		self.CELLHEIGHT = int(self.WINDOWHEIGHT / self.CELLSIZE)
 		
-		self.MAPRADIUS = 7
 		self.POINTCENTER = [(0.5+self.MAPRADIUS)*math.sqrt(3)/2*self.CELLSIZE, 
 										(0.5+self.MAPRADIUS*0.75)*self.CELLSIZE]
 	
@@ -166,15 +167,15 @@ class DrawingManager(object):
 		
 		#draws all hexes a selected unit can attack
 		if Input0.getState() == 'unitTarget':
-			if isinstance(Unit0.SELECTEDUNIT, Tank) or isinstance(Unit0.SELECTEDUNIT, Engineer):
+			if Unit0.SELECTEDUNIT in Unit0.TANKS:
 				FR = Unit0.SELECTEDUNIT.statFR
-			elif isinstance(Unit0.SELECTEDUNIT, Artillery):
+			elif Unit0.SELECTEDUNIT in Unit0.ARTILLERY:
 				FR = Unit0.SELECTEDUNIT.statMaxFR
 			else:
 				FR = 0
 				
 			for hex in Map0.getRing(FR, Unit0.SELECTEDUNIT.statCoord, width = 0):
-				if isinstance(Unit0.SELECTEDUNIT, Artillery):
+				if Unit0.SELECTEDUNIT in Unit0.ARTILLERY:
 					if hex in Map0.getRing(Unit0.SELECTEDUNIT.statMinFR, Unit0.SELECTEDUNIT.statCoord, width = 0):
 						continue
 				self.drawHex(hex, self.LIGHTRED, 0)
@@ -191,11 +192,11 @@ class DrawingManager(object):
 				if unit.statCoord in Unit0.PLAYERFOV[Unit0.SELECTEDPLAYER]:
 					self.drawHex(unit.statCoord, self.LIGHTRED, 0)
 		
-		#redraws the units with a different color so they're visible during unit attack targeting
+		#redraws the units with a different color so they're visible during unit's attack targeting
 		if Input0.getState() == 'unitTarget':
-			if isinstance(Unit0.SELECTEDUNIT, Tank):
+			if Unit0.SELECTEDUNIT in Unit0.TANKS:
 				FR = Unit0.SELECTEDUNIT.statFR
-			elif isinstance(Unit0.SELECTEDUNIT, Artillery):
+			elif Unit0.SELECTEDUNIT in Unit0.ARTILLERY:
 				FR = Unit0.SELECTEDUNIT.statMaxFR
 			else:
 				FR = 0
@@ -207,7 +208,7 @@ class DrawingManager(object):
 		#draws movement queues and attack targets for owned units
 		for unit in Unit0.UNITARRAY:
 			if Unit0.PLAYERARRAY[unit.owner] == Unit0.SELECTEDPLAYER:
-				if unit in Unit0.TANKS or unit in Unit0.ENGINEERS:
+				if unit in Unit0.TANKS:
 					if unit.targetedUnit != None:
 						self.drawLine(unit.statCoord, unit.targetedUnit.statCoord, self.RED)
 				elif unit in Unit0.ARTILLERY:

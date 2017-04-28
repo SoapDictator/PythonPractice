@@ -28,6 +28,8 @@ class Main(object):
 		Map0.defineGlobals(Window0, Unit0)
 		Unit0.defineGlobals(Window0, Map0, Unit0)
 		
+		print("\n============")
+		print("==Turn %s==" % Event0.TURNCOUNTER)
 		self.test()
 		
 		while True:
@@ -37,7 +39,12 @@ class Main(object):
 	
 	def test(self):
 		Event0.eventAdd("EventUnitCreate", ("Tank", [0, 0], "player1"))
-		Event0.eventAdd("EventUnitCreate", ("Artillery", [3, 1], "player1"))
+		Event0.eventAdd("EventUnitCreate", ("Engineer", [2, 1], "player1"))
+		Event0.eventHandle()
+		
+		Unit0.UNITARRAY[0].statHP -= 8
+		testUnit = Unit0.UNITARRAY[1]
+		testUnit.castAbility(testUnit.statAbilities[0], Unit0.UNITARRAY[0])
 		Event0.eventHandle()
 
 StartShenanigans = Main()
