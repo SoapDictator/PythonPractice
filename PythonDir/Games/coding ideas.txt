@@ -26,7 +26,7 @@ drawing management class #so window drawing and unit drawin is separate? make th
 -> map management
 	-constants required for drawing the window and everything on it
 
-input management class #keyboard, mouse management, command pattern is king
+input management class #keyboard, mouse management
 -> unit management
 -> map management
 	+state machine for inputs
@@ -70,11 +70,10 @@ input states:	#some game events are able to switch those around
 GUI:
 	- so the basic unit interaction gui:
 		- buttons for movement and attack actions
-		- buttons for abilities' casting
+		- buttons for ability casting
 		- button for undoing all actions
 		
 	- add additional "lense" so it will be possible to look up other units' attack and movement ranges
-	(that requres proper illustration of said ranges, so i need to actually change how hex coloring works)
 	
 	- add the ability to scroll the map horizontally and vertically
 		- adding another reference coodinates for drawing, well, everything
@@ -82,22 +81,40 @@ GUI:
 	
 	- add tooltips
 	
+	+need a way to determine elements of GUI that are being interacted with
+		+each element needs to have stored dimentions
+		+checks for which element was clicked
+		+ways to differentiate map interactions from GUI interactions
+	
 ###
 
 TODO:
+	!- rewrite some classes as separate managers(interfaces) and functional classes
+	#then the following line is rendered obsolete, since i will be rewriting 50% of the code regardless
+	#- refactor old code, file by file (2/5 done)
+	- eventUnitDestroy is not fucking working; this code is rubbish, i should just rewrite all of it
+	- add avalible units and rewrite the code to use coding for units instead of their names
+	- rewrite moveUnit - it's broke as hell, i was trying to be nice, but it refuses to comply
+	(i've tried starting a separate thread, but somthing went wrong, i will probably revert changes to moveUnit for now)
+	- rewrite FOV calculations in reference to units, also fix it
+	- i have a conflict between player names and ids in getting fov by unit's owner
+	(so, i should probably save calculated fov per unit in the unit's object)
+	- add all calculation of movement/attack range to the unit and store the values, instead of calculating them evey frame
+	- add a mechanism to track position of everything on the map, using MAP0.Map to store stuff
+	(that will also allow to significantly simplify drawing stuff)
+	- add casting distanse to abilities directly instead of using unit's VR stat
+	- add auras classes, tied to abilities
+	- optimize map drawing to draw minimal amount of lines in the hex grid (i have to think of a way to draw only one line on hex intersection)
+	- rewrite abilities to be stored by their objects, not by ID
 	- code in the way to store temporary stat bonuses to units (have active buff array on the unit and make all stat check to add bonuses from buffs)
-	- add a function of undoing attacks and movement queue to the unit directly (and remove that functionality from the eventUndo)
-	- add a fucntion for undoing casted abilities (it will go to the ability and make isActive = False)
-	? - add a reference table so it will be possible to find units in SCOUTS, TANKS, etc.
-	# - add a function that will determine the color of the hex so it won't draw hexes on top of each other 50 times over
+	- add a function for undoing casted abilities (it will go to the ability and make isActive = False)
 	# - fix colision resolver to properly resolve scenarios when 2 units with the same speed move in the same line
-	# - look up how to do vector graphics in Pygame
 	- make a basic GUI for easier interactions with units
+	- add a way to track mouse movement in input manager (for map mouse scrolling)
 	- implement some existing units and add their abilities
 
 DONE:
-	= added ability mechanics into the game
-	= replaced engineer's "attack" with a proper healing ability "EngieHeal" (now it will properly heal units)
-	= added a passive ammo replenishing ability to the engineer
-	= reworked eventAdd function (no longer has hard-coded instance constructor)
-	= reworked unitCreate to add abilities upon creation and it now doesn't include hard-code
+	= optimized map drawing to only draw what is currently on the screen
+	= optimized hex drawing by determining their color first and then drawing all of them once
+	= added a functions to undo attacks and movement queues of units directly from unit object(and removed that functionality from the Event0.eventUndo)
+	= unit manager code was rewritten to be less of a crap

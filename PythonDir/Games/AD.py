@@ -2,10 +2,10 @@
 #================
 #|| Artificially Destined ||
 #================
-#by SoapDictator
-#
+#written by SoapDictator
+#================
 
-import pygame, sys, math
+import pygame, sys, math, thread
 from pygame.locals import *
 from AD_event import *
 from AD_drawing import *
@@ -29,22 +29,26 @@ class Main(object):
 		Unit0.defineGlobals(Window0, Map0, Unit0)
 		
 		print("\n============")
-		print("==Turn %s==" % Event0.TURNCOUNTER)
+		print("==Turn 0==")
 		self.test()
+		
+		#try:
+		#	thread.start_new_thread(Window0.screenStartDrawing, ())
+		#except:
+		#	print(":(")
 		
 		while True:
 			Input0.handleInput()
 			Window0.screenRefresh()
-			Window0.FPSCLOCK.tick(Window0.FPS)
 	
 	def test(self):
 		Event0.eventAdd("EventUnitCreate", ("Tank", [0, 0], "player1"))
-		Event0.eventAdd("EventUnitCreate", ("Engineer", [2, 1], "player1"))
+		Event0.eventAdd("EventUnitCreate", ("Artillery", [2, 1], "player2"))
 		Event0.eventHandle()
 		
-		Unit0.UNITARRAY[0].statHP -= 8
-		testUnit = Unit0.UNITARRAY[1]
-		testUnit.castAbility(testUnit.statAbilities[0], Unit0.UNITARRAY[0])
+		#Unit0.UNITARRAY[0].statCur["HP"] -= 8
+		testUnit = Unit0.getAllUnits()[1]
+		#testUnit.castAbility(testUnit.statAbilities[0], Unit0.UNITARRAY[0])
 		Event0.eventHandle()
 
 StartShenanigans = Main()

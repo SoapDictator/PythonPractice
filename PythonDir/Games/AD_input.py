@@ -1,17 +1,18 @@
 import pygame, sys
 from pygame.locals import *
-from AD_unit import *
+#from AD_unit import *
 
 class InputManager(object):
 	inputState = ['moveSelection', 'unitSelected', 'unitTarget']
 	currentState = inputState[0]
+	heldKey = []
 	
 	def defineGlobals(self, EventManager, DrawingManager, MapManager, UnitManager):
-		global Event0, Window0, Map0, Unit0
-		Event0 = EventManager
-		Window0 = DrawingManager
-		Map0 = MapManager
-		Unit0 = UnitManager
+		global EVENT0, WINDOW0, MAP0, UNIT0
+		EVENT0 = EventManager
+		WINDOW0 = DrawingManager
+		MAP0 = MapManager
+		UNIT0 = UnitManager
 	
 	def getState(self):
 		return self.currentState
@@ -19,64 +20,88 @@ class InputManager(object):
 	def setState(self, num):
 		self.currentState = self.inputState[num]
 		if num == 0:
-			 Unit0.SELECTEDUNIT = None
-	
+			 UNIT0.resetUnitSelected()
+			 
 	def handleInput(self):
+		if len(self.heldKey) != 0:
+			for key in self.heldKey:
+				if key == K_DOWN:		WINDOW0.screenScroll([0, -1])
+				elif key == K_UP:		WINDOW0.screenScroll([0, +1])
+				elif key == K_LEFT:		WINDOW0.screenScroll([+1, 0])
+				elif key == K_RIGHT:	WINDOW0.screenScroll([-1, 0])
+	
 		for event in pygame.event.get():	#this is chinese level of programming, needs fixing as well
 			if event.type == QUIT:
 				self.terminate()
+			
+			if event.type == KEYUP:
+				if event.key == K_DOWN:		del self.heldKey[self.heldKey.index(K_DOWN)]
+				elif event.key == K_UP:			del self.heldKey[self.heldKey.index(K_UP)]
+				elif event.key == K_LEFT:		del self.heldKey[self.heldKey.index(K_LEFT)]
+				elif event.key == K_RIGHT:		del self.heldKey[self.heldKey.index(K_RIGHT)]
 				
+			if event.type == KEYDOWN:
+				if event.key == K_DOWN:	self.heldKey.append(K_DOWN)
+				elif event.key == K_UP:		self.heldKey.append(K_UP)
+				elif event.key == K_LEFT:		self.heldKey.append(K_LEFT)
+				elif event.key == K_RIGHT:	self.heldKey.append(K_RIGHT)
+			
 			if self.getState() == 'moveSelection':
 				if pygame.mouse.get_pressed() == (1, 0, 0):
-					coord = Window0.pixeltohex(pygame.mouse.get_pos())
-					Unit0.SELECTEDUNIT = Map0.getUnit(coord)
-					if Unit0.SELECTEDUNIT != None:	self.setState(1)
-					elif coord not in Map0.MOARRAY:
-						Map0.MOARRAY.append(coord)
+					coord = WINDOW0.pixeltohex(pygame.mouse.get_pos())
+					UNIT0.setUnitSelected(MAP0.getUnit(coord))
+					if UNIT0.getUnitSelected() != None:	
+						self.setState(1)
+					elif coord not in MAP0.MOARRAY:
+						MAP0.MOARRAY.append(coord)
 					else:
-						for i in range(0, len(Map0.MOARRAY)+1):
-							if Map0.MOARRAY[i] == coord:
-								del Map0.MOARRAY[i]
+						for i in range(0, len(MAP0.MOARRAY)+1):
+							if MAP0.MOARRAY[i] == coord:
+								del MAP0.MOARRAY[i]
 								break
+				
 				if event.type == KEYDOWN:
 					if event.key == K_ESCAPE:	self.terminate()
-					elif event.key == K_e:	Event0.eventHandle()
-					elif event.key == K_z:		Event0.eventUndo()
-					
+					elif event.key == K_e:			EVENT0.eventHandle()
+					elif event.key == K_z:			EVENT0.eventUndo()
+										
 			elif self.getState() == 'unitSelected':
+				unit = UNIT0.getUnitSelected()
 				if pygame.mouse.get_pressed() == (1, 0, 0):
-					coord = Window0.pixeltohex(pygame.mouse.get_pos())
-					path = Map0.getPath(Unit0.SELECTEDUNIT.statSpeed, Unit0.SELECTEDUNIT.statCoord, coord)
-					#Unit0.MOVEQUEUE[Unit0.SELECTEDUNIT.arrayPos] = path[::-1]
-					Unit0.SELECTEDUNIT.addMoveQueue(path[::-1])
+					coord = WINDOW0.pixeltohex(pygame.mouse.get_pos())
+					path = MAP0.getPath(unit.statCur["SPD"], unit.getCoord(), coord)
+					unit.setMoveQueue(path[::-1])
 					self.setState(0)
 				if event.type == KEYDOWN:
-					if event.key == K_ESCAPE:	self.setState(0)
+					if event.key == K_ESCAPE:		self.setState(0)
 					elif event.key == K_a:			self.setState(2)
-					elif event.key == K_z:			Event0.eventUndo()
+					elif event.key == K_z:			
+						unit.resetMoveQueue()
+						unit.resetTarget()
 					
 			elif self.getState() == 'unitTarget':
+				unit = UNIT0.getUnitSelected()
 				if pygame.mouse.get_pressed() == (1, 0, 0):
-					if Unit0.SELECTEDUNIT in Unit0.TANKS:
-						FR = Unit0.SELECTEDUNIT.statFR
-					elif Unit0.SELECTEDUNIT in Unit0.ARTILLERY:
-						FR = Unit0.SELECTEDUNIT.statMaxFR
+					if UNIT0.isTank(unit) or UNIT0.isArti(unit):
+						FR = unit.statCur["FRmax"]
 					else:
-						FR = 0
+						self.setState(1)
+						continue
 						
-					coord = Window0.pixeltohex(pygame.mouse.get_pos())
-					if Map0.getDistance(Unit0.SELECTEDUNIT.statCoord, coord) <= FR:
-						isok = Unit0.SELECTEDUNIT.targetChange(coord)
+					coord = WINDOW0.pixeltohex(pygame.mouse.get_pos())
+					if MAP0.getDistance(unit.getCoord(), coord) <= FR:
+						isok = unit.setTarget(coord)
 						if isok:
 							self.setState(1)
 						break
 				if event.type == KEYDOWN:
 					if event.key == K_ESCAPE:	self.setState(1)
 					elif event.key == K_e:		
-						Unit0.SELECTEDUNIT.targetChange()
+						#unit.setTarget()
 						self.setState(1)
 
 	def terminate(self):
-		print("Terminated on turn %s.\n" % Event0.TURNCOUNTER)
+		print("Terminated on turn %s." % EVENT0.getTurnCounter())
+		print("============\n")
 		pygame.quit()
 		sys.exit()

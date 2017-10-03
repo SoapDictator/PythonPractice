@@ -94,11 +94,28 @@ class MapManager(object):
 				area.append(list(hex))
 			return area
 	
+	#returns a rectangle of hexes
+	def getRectangle(self, hexStart, hexStop):
+		rectangle = []
+		
+		offset1 = hexStart[1] - hexStop[1] 
+		for q in range(hexStart[0], hexStop[0]-offset1-1):
+			offset2 = 0;
+			temp = 0
+			for r in range(hexStart[1], hexStop[1]+1):
+				if self.getDistance([q+offset2, r], [0, 0]) <= Window0.MAPRADIUS:
+					rectangle.append([q+offset2, r])
+
+				temp -= 0.5
+				offset2 = int(math.floor(temp))
+				
+		return rectangle
+	
 	#returns a unit in a given coordiante if it's there, otherwise returns None
 	def getUnit(self, coord):
-		for UNIT in Unit0.UNITARRAY:
-			if [UNIT.statCoord[0], UNIT.statCoord[1]] == [coord[0], coord[1]]:
-				return UNIT
+		for unit in Unit0.getAllUnits():
+			if [unit.statCoord[0], unit.statCoord[1]] == [coord[0], coord[1]]:
+				return unit
 		return None
 	
 	def getPath(self, limit, origin, target):

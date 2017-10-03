@@ -1,151 +1,257 @@
 import pygame, sys, math
 from pygame.locals import *
 
+global PLAYERS, AVAILIBLEUNITS, AVAILIBLEABILITIES, AVAILIBLEEFFECTS
+PLAYERS = {"player1": 0, "player2": 1}
+AVAILIBLEUNITS = ["Tank", "Scout", "Artillery", "Engineer"]
+AVAILIBLEABILITIES = ["A001", "A002"]
+AVAILIBLEEFFECTS = []
+
 class UnitManager(object):
 	#array of ALL units on the map
-	UNITARRAY = []
+	unitArray = []
 	
-	SCOUTS = []
-	TANKS = []
-	ARTILLERY = []
-	ENGINEERS = []
+	unitListScout = []
+	unitListTank = []
+	unitListArti = []
+	unitListEngi = []
 	
-	#array of ALL movement queues of ALL units, position of the movement queue is determined by a unit's position in UNITARRAY
-	MOVEQUEUE = []
+	#array of ALL movement queues of ALL units, position of the movement queue is 
+	#determined by a unit's position in unitArray
+	moveQueue = []
 	
-	#dictionary of all existing abilities; "name": priority
-	ABILITYARRAY = {"A001": "EngieHeal", "A002": "ReplenishAmmo"}
+	playerSelectedDEFAULT = None
+	playerSelected = None
+	unitSelectedDEFAULT = None	#default value for a selected unit
+	unitSelected = None
 	
-	PLAYERARRAY = {}	#array of all players; defines unit ownership
-	SELECTEDPLAYER = None
-	SELECTEDUNIT = None	#currently selected unit; needs to be reseted after the unit is deselected
+	unitMoveFlags = []
+	moveTickNom = 50
+	moveTick = 0
 	
-	PLAYERFOV = [[], []]
+	playerFOV = []
 	
 	def __init__(self):
-		self.PLAYERARRAY["player1"] = 0
-		self.PLAYERARRAY["player2"] = 1
-		self.SELECTEDPLAYER = self.PLAYERARRAY["player1"]
+		self.setPlayerSelected("player1")
+		self.resetPlayerFOV()
 	
 	def defineGlobals(self, DrawingManager, MapManager, UnitManager):
-		global Window0, Map0, Unit0
-		Window0 = DrawingManager
-		Map0 = MapManager
-		Unit0 = UnitManager
+		global WINDOW0, MAP0, UNIT0
+		WINDOW0 = DrawingManager
+		MAP0 = MapManager
+		UNIT0 = UnitManager
 	
-	#creates a new unit and adds it to the UNITARRAY as well as creates an entry in MOVEQUEUE; new unit will always be the last one in the array
+	#creates a new unit and adds it to the unitArray as well as creates an entry in 
+	#moveQueue; new unit will always be the last one in the array
 	def unitCreate(self, unitType, coord, player):
-		toX = coord[0]
-		toY = coord[1]
+		if unitType not in AVAILIBLEUNITS:
+			pass
+		if len(coord) != 2:
+			pass
+		if player not in PLAYERS:
+			pass
 		
+		toQ = coord[0]
+		toR = coord[1]
+		
+		#object factory, nothing to see here
 		targetUnit = getattr(Units, unitType)
 		NewUnit = targetUnit()
-		self.UNITARRAY.append(NewUnit)
+		self.unitArray.append(NewUnit)
 		
-		NewUnit.owner = player
-		NewUnit.arrayPos = len(self.UNITARRAY)-1
-		NewUnit.statCoord = [toX, toY]
-		self.MOVEQUEUE.append([[toX, toY]])
-		NewUnit.instAbilities = []
+		#assigning values and adding the unit into appropriate arrays
+		NewUnit.setOwner(PLAYERS[player])
+		NewUnit.setArrayPosition(len(self.unitArray)-1)
+		NewUnit.setCoord(toQ, toR)
+		self.moveQueue.append([[toQ, toR]])
 		
 		if len(NewUnit.statAbilities) > 0:
-			for ability in NewUnit.statAbilities:
-				self.unitAddAbility(ability, NewUnit)
+			for abilityID in NewUnit.statAbilities:
+				self.unitAddAbility(abilityID, NewUnit)
 	
 	def unitDestroy(self, deletedUnit):
-		arrayPos = deletedUnit.arrayPos
+		if deletedUnit not in self.unitArray():
+			pass
+		arrayPos = deletedUnit.getArrayPosition()
 		
-		del self.UNITARRAY[arrayPos]
-		del self.MOVEQUEUE[arrayPos]
-		del deletedUnit.instAbilities[:]
+		del self.unitArray[arrayPos]
+		del self.moveQueue[arrayPos]
 		
-		if deletedUnit in Unit0.SCOUTS:
-			del Unit0.SCOUTS[Unit0.SCOUTS.index(deletedUnit)]
-		elif deletedUnit in Unit0.TANKS:
-			del Unit0.TANKS[Unit0.TANKS.index(deletedUnit)]
-		elif deletedUnit in Unit0.ARTILLERY:
-			del Unit0.ARTILLERY[Unit0.ARTILLERY.index(deletedUnit)]
-		elif deletedUnit in Unit0.ENGINEERS:
-			del Unit0.ENGINEERS[Unit0.ENGINEERS.index(deletedUnit)]
+		if self.isScout(deletedUnit):
+			del UNIT0.unitListScout[UNIT0.unitListScout.index(deletedUnit)]
+		elif self.isTank(deletedUnit):
+			del UNIT0.unitListTank[UNIT0.unitListTank.index(deletedUnit)]
+		elif self.isArti(deletedUnit):
+			del UNIT0.unitListArti[UNIT0.unitListArti.index(deletedUnit)]
+		elif self.isEngi(deletedUnit):
+			del UNIT0.unitListEngi[UNIT0.unitListEngi.index(deletedUnit)]
 		
-		for UNIT in self.UNITARRAY: 
-			if arrayPos < UNIT.arrayPos:	#shifts all tanks situated after the deleted one in the array, since the MOVEQUEUE position is tracked by arrayPos
-				UNIT.arrayPos -= 1
+		#shifts all units situated after the deleted one in the array, since the moveQueue
+		#position is tracked by arrayPos
+		for UNIT in self.unitArray: 
+			curArrayPos = UNIT.getArrayPosition()
+			if arrayPos < curArrayPos:	
+				UNIT.setArrayPosition(curArrayPos - 1)
 	
+	def isScout(self, unit):
+		if unit in UNIT0.unitListScout:
+			return True
+		return False
+		
+	def isTank(self, unit):
+		if unit in UNIT0.unitListTank:
+			return True
+		return False
+		
+	def isArti(self, unit):
+		if unit in UNIT0.unitListArti:
+			return True
+		return False
+		
+	def isEngi(self, unit):
+		if unit in UNIT0.unitListEngi:
+			return True
+		return False
+	
+	#rewrite this ASAP
 	#resolves situations when 2 or more units are trying to travel to the same final position
 	def moveResolveCollision(self):
-		for UNIT in self.UNITARRAY:
+		for UNIT in self.unitArray:
 			#checking all units which are moving this turn
-			if len(self.MOVEQUEUE[UNIT.arrayPos]) > 1: 
-				for unit in self.UNITARRAY:
+			if len(UNIT.getMoveQueue()) > 1: 
+				for unit in self.unitArray:
 					if UNIT != unit:
-						finalUNITpos = self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
-						finalunitpos = self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
-						#moving unit can't take the position of the immobile unit
-						if finalUNITpos == finalunitpos and len(self.MOVEQUEUE[unit.arrayPos]) < 2:
-							del self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
-						#if one unit moved less than the other it will take the position
-						elif finalUNITpos == finalunitpos and len(self.MOVEQUEUE[UNIT.arrayPos]) > len(self.MOVEQUEUE[unit.arrayPos]):
-							del self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
-						#if one unit moved less than the other it will take the position
-						elif finalUNITpos == finalunitpos and len(self.MOVEQUEUE[UNIT.arrayPos]) < len(self.MOVEQUEUE[unit.arrayPos]):
-							del self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
-						#if both units moved the same distance						
-						elif finalUNITpos == finalunitpos and len(self.MOVEQUEUE[UNIT.arrayPos]) == len(self.MOVEQUEUE[unit.arrayPos]):
-							if UNIT.statSpeed > unit.statSpeed:
-								del self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
-							elif UNIT.statSpeed < unit.statSpeed:
-								del self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
-							#if both units traveled same distance and have the same speed noone will take the final position
-							else:
-								del self.MOVEQUEUE[UNIT.arrayPos][len(self.MOVEQUEUE[UNIT.arrayPos])-1]
-								#del self.MOVEQUEUE[unit.arrayPos][len(self.MOVEQUEUE[unit.arrayPos])-1]
+						UNITMoveLen = len(UNIT.getMoveQueue())
+						unitMoveLen = len(unit.getMoveQueue())
+						
+						UNITMoveTime = float(UNITMoveLen)/UNIT.statCur["SPD"]
+						unitMoveTime = float(unitMoveLen)/unit.statCur["SPD"]
+						
+						if UNITMoveTime > UNITMoveTime and unitMoveLen < 2:
+							del UNIT.getMoveQueue()[UNITMoveLen-1]
+						elif UNITMoveTime < UNITMoveTime and unitMoveLen < 2:
+							del unit.getMoveQueue()[unitMoveLen-1]
+						else: #defaut action if oth units arrived at the same time
+							del UNIT.getMoveQueue()[UNITMoveLen-1]
 	
-	#moves units according to their movement queues in MOVEQUEUE
-	def unitMove(self, units):			
+	def unitMoveStart(self, units):
+		self.unitMoveFlags = [0]*len(self.moveQueue)
+		flag = False
+		
 		self.moveResolveCollision()
 		
-		stopFlag = [0]*len(self.MOVEQUEUE)
-		sum = 0
-		
-		for step in range(1, 50):
-			for UNIT in units:
-				if len(self.MOVEQUEUE[UNIT.arrayPos]) <= 1:
-					stopFlag[UNIT.arrayPos] = 1
-					continue
-				elif step >= len(self.MOVEQUEUE[UNIT.arrayPos]):
-					stopFlag[UNIT.arrayPos] = 1
-					continue
-				UNIT.statCoord[0] = self.MOVEQUEUE[UNIT.arrayPos][step][0]
-				UNIT.statCoord[1] = self.MOVEQUEUE[UNIT.arrayPos][step][1]
-			
-			for flag in stopFlag:
-				sum += flag
-			if sum == len(units):
+		while True:
+			if self.unitMoveTick(units):
 				break
-				
-			sum = 0
 			pygame.time.wait(75)
-			Window0.screenRefresh()
+			
+		self.unitMoveReset(units)
+	
+	#moves units according to their movement queues in moveQueue
+	def unitMoveTick(self, units):		
+		step = self.moveTick
+		summ = 0
 		
 		for UNIT in units:
-			self.MOVEQUEUE[UNIT.arrayPos][0] = [UNIT.statCoord[0], UNIT.statCoord[1]]
-			del self.MOVEQUEUE[UNIT.arrayPos][1:]
+			unitArrayPos = UNIT.getArrayPosition()
+			if self.unitMoveFlags[unitArrayPos] == 1:
+				continue
+				
+			curMoveQueue = UNIT.getMoveQueue()
+			
+			if len(curMoveQueue) <= 1 or step >= len(curMoveQueue):
+				self.unitMoveFlags[unitArrayPos] = 1
+				continue
+				
+			UNIT.setCoord(curMoveQueue[step][0], curMoveQueue[step][1])
+			
+		self.moveTick = step+1
+	
+		#stop conditions
+		for flag in self.unitMoveFlags:
+			summ += flag
+		if summ == len(units) or self.moveTick > self.moveTickNom:
+			return True
+		return False
+	
+	def unitMoveReset(self, units):
+		self.moveTick = 0
+		del self.unitMoveFlags[:]
+		
+		for unit in units:
+			arrayPos = unit.getArrayPosition()
+			self.moveQueue[arrayPos][0] = unit.getCoord()
+			del self.moveQueue[arrayPos][1:]
 	
 	def unitAddAbility(self, abilityID, caster):
-		if abilityID not in self.ABILITYARRAY:
+		if abilityID not in AVAILIBLEEFFECTS:
 			pass
+			
 		targetAbility = getattr(Abilities, abilityID)
 		instance = targetAbility(caster)
 		caster.instAbilities.append(instance)
-	
-	def unitFOV(self):
-		for unit in self.UNITARRAY:
-			for hex in Map0.getVisibility(unit.statVR, unit.statCoord):
-				if hex not in self.PLAYERFOV[self.PLAYERARRAY[unit.owner]]:
-					self.PLAYERFOV[self.PLAYERARRAY[unit.owner]].append(hex)
 
 #------------------------------------------
+#getters and setters
+	def getUnitSelected(self):
+		return self.unitSelected
+		
+	def resetUnitSelected(self):
+		self.unitSelected = self.unitSelectedDEFAULT
+		
+	def setUnitSelected(self, unit):
+		if unit == self.unitSelectedDEFAULT:
+			pass
+		self.unitSelected = unit
+	
+	def getAllUnits(self):
+		return self.unitArray
+	
+	def getTanks(self):
+		return self.unitListTank
+		
+	def getScouts(self):
+		return self.unitListScout
+		
+	def getArties(self):
+		return self.unitListArti
+		
+	def getEngies(self):
+		return self.unitListEngi
+	
+	def getPlayerSelected(self):
+		return self.playerSelected
+	
+	def getPlayerSelectedID(self):
+		return PLAYERS[self.playerSelected]
+	
+	def setPlayerSelected(self, player):
+		if player not in PLAYERS:
+			pass
+		self.playerSelected = player
+		
+	def getPlayerFOV(self, playerID):
+		return self.playerFOV[playerID]
+		
+	def resetPlayerFOV(self):
+		del self.playerFOV[:]
+		for i in range(0, len(PLAYERS)):
+			self.playerFOV.append([])
+			
+	def setPlayerFOV(self, playerID):
+		self.resetPlayerFOV()
+		
+		toBeFOV = []
+		for unit in self.unitArray:
+			for hex in MAP0.getVisibility(unit.statCur["VR"], unit.getCoord()):
+				if hex not in self.playerFOV[playerID]:
+					toBeFOV.append(hex)
+					
+		self.playerFOV[playerID] = toBeFOV
+		
+#------------------------------------------
+#------------------------------------------
+
 class Units:
 	class Unit(object):
 		statCoord = [0, 0]
@@ -154,108 +260,167 @@ class Units:
 		arrayPos = 0
 		owner = None
 		
-		def addMoveQueue(self, queue):
-			Unit0.MOVEQUEUE[self.arrayPos] = queue[:]
-			
+		statNom = {	"HP": 0,
+							"AR": 0,
+							"SH": 0,
+							"SPD": 0,
+							"VR": 0}
+		statCur = {}
+		
 		def castAbility(self, abilityID, data):
 			if abilityID not in self.statAbilities:
 				pass
 			ability = self.instAbilities[self.statAbilities.index(abilityID)]
 			ability.activate(data)
+						
+		def setInitialStats (self, HP, AR, SH, SPD, VR):
+			self.statNom["HP"] = HP
+			self.statNom["AR"] = AR
+			self.statNom["SH"] = SH
+			self.statNom["SPD"] = SPD
+			self.statNom["VR"] = VR
+			self.statCur = self.statNom.copy()
+			
+		def getMoveQueue(self):
+			return UNIT0.moveQueue[self.arrayPos]
+			
+		def setMoveQueue(self, queue):
+			UNIT0.moveQueue[self.arrayPos] = queue[:]
+			
+		def resetMoveQueue(self):
+			UNIT0.moveQueue[self.arrayPos] = [self.statCoord[:]]
+			
+		def getCoord(self):
+			return self.statCoord
+			
+		def setCoord(self, Q, R):
+			self.statCoord = [Q, R]
 		
+		def getTarget(self):
+			return None
+			
+		def setTarget(self):
+			return False
+		
+		def getOwner(self):
+			return self.owner
+		
+		def getOwnerID(self):
+			return PLAYERS[self.owner]
+		
+		def setOwner(self, owner):
+			self.owner = owner
+		
+		def getArrayPosition(self):
+			return self.arrayPos
+		
+		def setArrayPosition(self, position):
+			self.arrayPos = position
+#------------------------------------------
+			
 	class Scout(Unit):
-		statMaxHP = 6
-		statHP = statMaxHP
-		statArmor = 0
-		statSpeed = 5
-		statVR = 5
-		
 		def __init__(self):
-			Unit0.SCOUTS.append(self)
+			UNIT0.unitListScout.append(self)
+			self.setInitialStats(6, 5, 0, 5, 5)
+
+#------------------------------------------
 			
 	class Tank(Unit):
-		statMaxHP = 10
-		statHP = statMaxHP
-		statArmor = 2
-		statSpeed = 4
-		statVR = 3
-		statDamage = 10
-		statFR = 3
-		statAmmoCap = 10
-		statAmmo = statAmmoCap
 		targetedUnit = None
 		
 		def __init__(self):
-			Unit0.TANKS.append(self)
+			UNIT0.unitListTank.append(self)
+			self.setInitialStats(10, 2, 2, 4, 3, 10, 0, 3, 10)
 		
-		def targetChange(self, coord):
-			if self.statAmmoCap != 0:
-				player = Unit0.PLAYERARRAY[self.owner]
-				if Map0.getDistance(self.statCoord, coord) <= self.statFR and coord in Unit0.PLAYERFOV[player]:
-					targetedUnit = Map0.getUnit(coord)
+		def setTarget(self, coord):
+			if self.statCur["AMM"] != 0:
+				dist = MAP0.getDistance(self.statCoord, coord)
+				if dist <= self.statCur["FRmax"] and coord in UNIT0.getPlayerFOV(self.owner):
+					targetedUnit = MAP0.getUnit(coord)
 					if targetedUnit != None and targetedUnit != self:
 						self.targetedUnit = targetedUnit
 						return True
 			return False
+			
+		def resetTarget(self):
+			self.targetedUnit = None
+			
+		def getTarget(self):
+			return self.targetedUnit
+			
+		def setInitialStats (self, HP, AR, SH, SPD, VR, DMG, FRmin, FRmax, AMM):
+			self.statNom["DMG"] = DMG
+			self.statNom["FRmin"] = FRmin
+			self.statNom["FRmax"] = FRmax
+			self.statNom["AMM"] = AMM
+			super(Units.Tank, self).setInitialStats(HP, AR, SH, SPD, VR)
 
+#------------------------------------------
+			
 	class Artillery(Unit):
-		statMaxHP = 8
-		statHP = statMaxHP
-		statArmor = 0
-		statSpeed = 4
-		statVR = 2
-		statDamage = 11
-		statMinFR = 2
-		statMaxFR = 5
-		statAmmoCap = 10
-		statAmmo = statAmmoCap
-		targetedCoord = [None]
+		targetedCoord = None
 		
 		def __init__(self):
-			Unit0.ARTILLERY.append(self)
+			UNIT0.unitListArti.append(self)
+			self.setInitialStats(8, 0, 4, 4, 2, 11, 2, 5, 10)
 		
-		def targetChange(self, coord):
-			if self.statAmmoCap != 0:
+		def setTarget(self, coord):
+			if self.statCur["AMM"] != 0:
 				targetedCoord = [coord[0], coord[1]]
-				dist = Map0.getDistance(self.statCoord, targetedCoord)
-				if dist > self.statMinFR and dist <= self.statMaxFR:
+				dist = MAP0.getDistance(self.statCoord, targetedCoord)
+				if dist > self.statCur["FRmin"] and dist <= self.statCur["FRmax"]:
 					self.targetedCoord = targetedCoord
-					Unit0.MOVEQUEUE[self.arrayPos] = [self.statCoord[:]]	#deleting the movement queue to prevent movement in the same turn
+					#deleting the movement queue to prevent movement in the same turn
+					self.resetMoveQueue()
 					return True
 			return False
 		
-		def addMoveQueue(self, queue):
-			super(Artillery, self).addMoveQueue(queue)
-			self.targetedCoord = [None]	#deletes the targeted coordinate to prevent attacking in the same turn
+		def resetTarget(self):
+			self.targetedCoord = None
 			
+		def getTarget(self):
+			return self.targetedCoord
+		
+		def setMoveQueue(self, queue):
+			super(Units.Artillery, self).setMoveQueue(queue)
+			#deletes the targeted coordinate to prevent attacking in the same turn
+			self.resetTarget()
+
+		def setInitialStats (self, HP, AR, SH, SPD, VR, DMG, FRmin, FRmax, AMM):
+			self.statNom["DMG"] = DMG
+			self.statNom["FRmin"] = FRmin
+			self.statNom["FRmax"] = FRmax
+			self.statNom["AMM"] = AMM
+			super(Units.Artillery, self).setInitialStats(HP, AR, SH, SPD, VR)
+
+#------------------------------------------
 			
 	class Engineer(Unit):
-		statMaxHP = 12
-		statHP = statMaxHP
-		statArmor = 1
-		statSpeed = 3
-		statVR = 2
-		statDamage = -5
-		statFR = 3
 		statAbilities = ["A001", "A002"]
 		
 		def __init__(self):
-			Unit0.ENGINEERS.append(self)
+			UNIT0.unitListEngi.append(self)
+			self.setInitialStats(12, 3, 4, 3, 2)
+			
 #------------------------------------------
-
+#------------------------------------------
 class Abilities:
 	class Ability(object):	
 		statName = "PrototypeAbility"
 		priority = 0
 		isActivated = False
 		caster = None
+		effects = []
 		
 		def __init__(self, caster):
 			self.caster = caster
 		
 		#transfers casting data and checks the activation conditions
 		def activate(self,data):
-			pass
+			self.isActivated = True
+			
+		def deactivate(self):
+			self.isActivated = False
 		
 		#action of the activated ability
 		def execute(self):
@@ -269,35 +434,35 @@ class Abilities:
 		def activate(self, data):
 			self.target = data
 			
-			dist = Map0.getDistance(self.caster.statCoord, self.target.statCoord)
-			if dist <= self.caster.statFR:
+			dist = MAP0.getDistance(self.caster.statCoord, self.target.statCoord)
+			if dist <= self.caster.statCur["VR"]:
 				self.isActivated = True
-				
+		
 		def execute(self):
-			self.isActivated = False
 			addedHP = 5
-			self.target.statHP += addedHP
-			if self.target.statHP > self.target.statMaxHP:
-				self.target.statHP = self.target.statMaxHP
-			print("Added %s HP to %s(now %s HP)" % (addedHP, self.target, self.target.statHP))
+			self.target.statCur["HP"] += addedHP
+			if self.target.statCur["HP"] > self.target.statNom["HP"]:
+				self.target.statCur["HP"] = self.target.statNom["HP"]
+			self.deactivate()
+			
+			print("Added %s HP to %s(now %s HP)" % (addedHP, self.target, self.target.statCur["HP"]))
 			
 	class A002(Ability):
 		statName = "ReplenishAmmo"
 		priority = 30
-		isActivated = True
 		
 		def activate(self, data):
 			self.isActivated = True # passive ability, therefore it's always activated
 		
 		def execute(self):
 			addedAmmo = 5
-			for dir in Map0.DIRECTIONS:
+			for dir in MAP0.DIRECTIONS:
 				hex = [0, 0]
 				hex[0] = self.caster.statCoord[0] + dir[0]
 				hex[1] = self.caster.statCoord[1] + dir[1]
-				unit = Map0.getUnit(hex)
-				if unit in Unit0.TANKS or unit in Unit0.ARTILLERY:
-					unit.statAmmo += addedAmmo
-					if unit.statAmmo > unit.statAmmoCap:
-						unit.statAmmo = unit.statAmmoCap
-					print("Added %s Ammo to %s(now %s Ammo)" % (addedAmmo, unit, unit.statAmmo))
+				unit = MAP0.getUnit(hex)
+				if unit in UNIT0.unitListTank or unit in UNIT0.unitListArti:
+					unit.statCur["AMM"] += addedAmmo
+					if unit.statCur["AMM"] > unit.statNom["AMM"]:
+						unit.statCur["AMM"] = unit.statNom["AMM"]
+					print("Added %s Ammo to %s(now %s Ammo)" % (addedAmmo, unit, unit.statCur["AMM"]))
