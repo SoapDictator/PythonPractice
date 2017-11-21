@@ -75,46 +75,30 @@ GUI:
 		
 	- add additional "lense" so it will be possible to look up other units' attack and movement ranges
 	
-	- add the ability to scroll the map horizontally and vertically
-		- adding another reference coodinates for drawing, well, everything
-		(i will brobably have the scrolling values, so it'll be easy, just add scrolling to the coordinates)
-	
-	- add tooltips
-	
-	+need a way to determine elements of GUI that are being interacted with
-		+each element needs to have stored dimentions
-		+checks for which element was clicked
-		+ways to differentiate map interactions from GUI interactions
+	- add tooltips:
+		- display info about units (name/faction/type/stats/abilities/effects/etc.)
+		(maybe have one set of tooltips, when hovering over a unit, and an expanded version when selected)
+		- display ability/effect information
+		- display terrain info (type/obstacles/etc.)
+		
+	- draw outline on selected unit
+	- draw outline on "aura" effects
 	
 ###
 
 TODO:
-	!- rewrite some classes as separate managers(interfaces) and functional classes
-	#then the following line is rendered obsolete, since i will be rewriting 50% of the code regardless
-	#- refactor old code, file by file (2/5 done)
-	- eventUnitDestroy is not fucking working; this code is rubbish, i should just rewrite all of it
+	- fix creating units by their codes (same for events)
+	- write basic p2p stuff, so i can play with somebody already
 	- add avalible units and rewrite the code to use coding for units instead of their names
-	- rewrite moveUnit - it's broke as hell, i was trying to be nice, but it refuses to comply
-	(i've tried starting a separate thread, but somthing went wrong, i will probably revert changes to moveUnit for now)
-	- rewrite FOV calculations in reference to units, also fix it
-	- i have a conflict between player names and ids in getting fov by unit's owner
-	(so, i should probably save calculated fov per unit in the unit's object)
-	- add all calculation of movement/attack range to the unit and store the values, instead of calculating them evey frame
-	- add a mechanism to track position of everything on the map, using MAP0.Map to store stuff
-	(that will also allow to significantly simplify drawing stuff)
-	- add casting distanse to abilities directly instead of using unit's VR stat
-	- add auras classes, tied to abilities
-	- optimize map drawing to draw minimal amount of lines in the hex grid (i have to think of a way to draw only one line on hex intersection)
-	- rewrite abilities to be stored by their objects, not by ID
-	- code in the way to store temporary stat bonuses to units (have active buff array on the unit and make all stat check to add bonuses from buffs)
-	- add a function for undoing casted abilities (it will go to the ability and make isActive = False)
-	# - fix colision resolver to properly resolve scenarios when 2 units with the same speed move in the same line
-	- make a basic GUI for easier interactions with units
-	- add a way to track mouse movement in input manager (for map mouse scrolling)
-	- implement some existing units and add their abilities
+	- store FOV calculation results in unit objects as well as player global FOV
+	- add a way to store temporal arrays/values in window managers, as to not recalculate the same info every frame
+	- add a function for undoing casted abilities
+	- make a basic GUI for easier interactions with units (see GUI section of "ideas")
+	- add a way to track mouse movement in input manager for map mouse scrolling
 
 DONE:
-	= optimized map drawing to only draw what is currently on the screen
-	= optimized hex drawing by determining their color first and then drawing all of them once
-	= added a functions to undo attacks and movement queues of units directly from unit object(and removed that functionality from the Event0.eventUndo)
-	= unit manager code was rewritten to be less of a crap
+	= fixed base functionality of units (I wish that was a joke)
+	= fixed stat dictionaries not saving the data properly
+	= added effects' classes
+	= wrote a simple game event logger
+	= added states for units; now unit can be "Conflicted" if it shares the same hex with another unit (can't attack/use abilities)
